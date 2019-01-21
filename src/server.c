@@ -16,28 +16,32 @@
 #include "server.h"
 #include "common.h"
 
-#define PORT "32000"
+#define PORT "3490"
 #define CMD_LIMIT 100
 #define TOKENS 3
 #define USAGE "[get|put|quit] filenamesource filenamedest"
-#define MAX_FILENAME_LEN 30
+#define MAX_FILENAME_LEN 64
 #define BACKLOG 10
 
 struct addrinfo * find_server(int *sock_fd, struct addrinfo *servinfo) {
     int yes = 1;
     struct addrinfo *p;
+    int sock_fd_cpy = 0;
+
+    sock_fd_cpy = *sock_fd;
 
     for(p = servinfo; p != NULL; p = p->ai_next) {
-      if ((*sock_fd = socket(p->ai_family, p->ai_socktype, p->ai_protocol)) == -1) { 
+      if ((sock_fd_cpy = socket(p->ai_family, p->ai_socktype, p->ai_protocol)) == -1) { 
         perror("server: socket");
         continue;
       }
-      if (setsockopt(*sock_fd, SOL_SOCKET, SO_REUSEADDR, &yes, sizeof(int)) == -1) {
+      printf("socket num: %d\n", *sock_fd);
+      if (setsockopt(sock_fd_cpy, SOL_SOCKET, SO_REUSEADDR, &yes, sizeof(int)) == -1) {
         perror("server: setsockopt");
         exit(1);
       }
-      if (bind(*sock_fd, p->ai_addr, p->ai_addrlen) == -1) {
-        printf("\nsa_family, sa_data, p->ai_addrlen: %d, %s, %d\n",
+      if (bind(sock_fd_cpy, p->ai_addr, p->ai_addrlen) == -1) {
+        printf("sa_family, sa_data, p->ai_addrlen: %d, %s, %d\n",
                 p->ai_addr->sa_family, p->ai_addr->sa_data, p->ai_addrlen);
 
         close(*sock_fd);
@@ -46,6 +50,8 @@ struct addrinfo * find_server(int *sock_fd, struct addrinfo *servinfo) {
       } 
     }
     free(servinfo);
+
+    *sock_fd = sock_fd_cpy;
 
     return p;
 }
@@ -154,17 +160,17 @@ int main(int argc, char **argv) {
     int new_fd = 0; // listening for the child process
     int status;
     struct command *cmd;
-    char hostname[1024];
+    /* char hostname[1024]; */
 
-    hostname[1023] = '\0';
-    gethostname(hostname, 1023);
+    /* hostname[1023] = '\0'; */
+    /* gethostname(hostname, 1023); */
 
     memset(&hints, 0, sizeof hints);
     hints.ai_family = AF_UNSPEC;
     hints.ai_socktype = SOCK_STREAM;
     hints.ai_flags = AI_PASSIVE;
     
-    if ((status = getaddrinfo(hostname, PORT, &hints, &servinfo)) != 0) {
+    if ((status = getaddrinfo(NULL, PORT, &hints, &servinfo)) != 0) {
         fprintf(stderr, "getaddrinfo error: %s\n", gai_strerror(status));
         exit(1);
     } 
