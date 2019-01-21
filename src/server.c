@@ -26,21 +26,18 @@
 struct addrinfo * find_server(int *sock_fd, struct addrinfo *servinfo) {
     int yes = 1;
     struct addrinfo *p;
-    int sock_fd_cpy = 0;
-
-    sock_fd_cpy = *sock_fd;
 
     for(p = servinfo; p != NULL; p = p->ai_next) {
-      if ((sock_fd_cpy = socket(p->ai_family, p->ai_socktype, p->ai_protocol)) == -1) { 
+      if ((*sock_fd = socket(p->ai_family, p->ai_socktype, p->ai_protocol)) == -1) { 
         perror("server: socket");
         continue;
       }
       printf("socket num: %d\n", *sock_fd);
-      if (setsockopt(sock_fd_cpy, SOL_SOCKET, SO_REUSEADDR, &yes, sizeof(int)) == -1) {
+      if (setsockopt(*sock_fd, SOL_SOCKET, SO_REUSEADDR, &yes, sizeof(int)) == -1) {
         perror("server: setsockopt");
         exit(1);
       }
-      if (bind(sock_fd_cpy, p->ai_addr, p->ai_addrlen) == -1) {
+      if (bind(*sock_fd, p->ai_addr, p->ai_addrlen) == -1) {
         printf("sa_family, sa_data, p->ai_addrlen: %d, %s, %d\n",
                 p->ai_addr->sa_family, p->ai_addr->sa_data, p->ai_addrlen);
 
@@ -50,8 +47,6 @@ struct addrinfo * find_server(int *sock_fd, struct addrinfo *servinfo) {
       } 
     }
     free(servinfo);
-
-    *sock_fd = sock_fd_cpy;
 
     return p;
 }
@@ -160,6 +155,7 @@ int main(int argc, char **argv) {
     int new_fd = 0; // listening for the child process
     int status;
     struct command *cmd;
+    int yes = 1;
     /* char hostname[1024]; */
 
     /* hostname[1023] = '\0'; */
@@ -174,8 +170,27 @@ int main(int argc, char **argv) {
         fprintf(stderr, "getaddrinfo error: %s\n", gai_strerror(status));
         exit(1);
     } 
-    
-    if ((p = find_server(&sock_fd, servinfo)) == NULL) {
+  
+    for(p = servinfo; p != NULL; p = p->ai_next) {
+        if ((sock_fd = socket(p->ai_family, p->ai_socktype, p->ai_protocol)) == -1) { 
+          perror("server: socket");
+          continue;
+        }
+        printf("socket num: %d\n", sock_fd);
+        if (setsockopt(sock_fd, SOL_SOCKET, SO_REUSEADDR, &yes, sizeof(int)) == -1) {
+          perror("server: setsockopt");
+          exit(1);
+        }
+        if (bind(sock_fd, p->ai_addr, p->ai_addrlen) == -1) {
+          close(sock_fd);
+          perror("server: bind");
+          continue;
+        } 
+    }
+
+    free(servinfo);
+
+    if (p == NULL) {
         fprintf(stderr, "server: failed to bind to valid addrinfo");
         exit(1);
     }
