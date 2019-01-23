@@ -16,19 +16,59 @@
 
 #include "common.h"
 
-#define MAXDATASIZE 100 // max number of bytes we can get at once
+#define PORT_SIZE 16
+#define HOSTNAME_SIZE 64
+#define USAGE "[get|put|quit] filenamesource filenamedest"
+
+int _put(int sockfd, struct command *cmd) {
+    FILE *file;
+    char cmd_buf[CMD_LIMIT];
+    char file_buf[MAX_DATA_SIZE];
+    size_t n_read;
+    size_t sz;
+
+    file = fopen(cmd->src, "r");
+    if (NULL == file) {
+        fprintf(stderr, "Failed to open file %s.\n", cmd->src);
+        return -1;
+    }
+
+    fseek(file, 0L, SEEK_END);
+    sz = ftell(file);
+    fseek(file, 0L, SEEK_SET); 
+    if (sz > MAX_DATA_SIZE) {
+        fprintf(stderr, "Filesize exceeds limits.\n");
+        return -1;
+    }
+    
+    cmd->fsz = sz;
+    serialize_cmd(cmd_buf, cmd); 
+    send(sockfd, cmd_buf, strlen(cmd_buf), 0);
+
+    while ((n_read = fread(file_buf, 1, sizeof file_buf, file)) > 0) {
+        send(sockfd, file_buf, n_read, 0);
+    }
+
+    fclose(file);
+
+    return 0;
+}
+
+int _get(int sockfd, struct command *cmd) {
+    return 0;
+}
 
 int main(int argc, char **argv) {
     int sockfd;
-    int numbytes;
-    char buf[MAXDATASIZE];
     struct addrinfo hints;
     struct addrinfo *servinfo;
     struct addrinfo *p;
     char s[INET6_ADDRSTRLEN];
     int status;
-    char *port;
-    char *hostname;
+    char port[PORT_SIZE];
+    char hostname[HOSTNAME_SIZE];
+    char cmd_buf[CMD_LIMIT];
+    struct command *cmd;
   
     memset(&hints, 0, sizeof hints);
     hints.ai_family = AF_UNSPEC;
@@ -37,13 +77,12 @@ int main(int argc, char **argv) {
     
     if (argc != 3) {
         printf("Usage: %s <host name> <port number>", argv[0]);
-        exit(0);
+        exit(1);
     }
     else {
-        port = malloc(sizeof argv[1]);
-        strcpy(port, argv[1]);
-        hostname = malloc(sizeof argv[2]);
-        strcpy(hostname, argv[2]);
+        strlcpy(hostname, argv[1], strlen(argv[1])+1);
+        strlcpy(port, argv[2], strlen(argv[2])+1);
+        printf("Using hostname %s and port %s\n", hostname, port);
     } 
     
     memset(&hints, 0, sizeof hints);
@@ -82,30 +121,30 @@ int main(int argc, char **argv) {
     
     freeaddrinfo(servinfo); // all done with this structure
     
-    if ((numbytes = recv(sockfd, buf, MAXDATASIZE-1, 0)) == -1) {
-        perror("recv");
-        exit(1);
+    while(1) {
+        printf("Enter command of the form '%s':\n", USAGE);
+
+        cmd = deserialize_cmd(get_input(cmd_buf));
+        if (NULL == cmd || cmd->type == INV) {
+            fprintf(stderr, "Poorly formed command.  Try again.\n");
+            continue;
+        }            
+
+        if (cmd->type == PUT) {
+            _put(sockfd, cmd);
+        }
+        else if (cmd->type == GET) {
+            _get(sockfd, cmd);
+        }
+        else {
+           free(cmd);
+           break;
+        }
+
+        free(cmd);
     }
     
-    buf[numbytes] = '\0';
-    
-    printf("client: received '%s'\n", buf);
-    
     close(sockfd);
-    
-    free(p);
   
-    return 0;
-}
-
-int get(char *local_file_name, char *remote_file_name) {
-  return 0;
-}
-
-int put(char *local_file_name, char *remote_file_name) {
-  return 0;
-}
-
-void quit(void) {
-  exit(EXIT_FAILURE);
+    exit(EXIT_SUCCESS);
 }

@@ -17,128 +17,67 @@
 #include "common.h"
 
 #define PORT "3490"
-#define CMD_LIMIT 100
-#define TOKENS 3
-#define USAGE "[get|put|quit] filenamesource filenamedest"
-#define MAX_FILENAME_LEN 64
 #define BACKLOG 10
+#define HOSTNAME_LEN 256
 
 struct addrinfo * find_server(int *sock_fd, struct addrinfo *servinfo) {
     int yes = 1;
     struct addrinfo *p;
 
     for(p = servinfo; p != NULL; p = p->ai_next) {
-      if ((*sock_fd = socket(p->ai_family, p->ai_socktype, p->ai_protocol)) == -1) { 
-        perror("server: socket");
-        continue;
-      }
-      printf("socket num: %d\n", *sock_fd);
-      if (setsockopt(*sock_fd, SOL_SOCKET, SO_REUSEADDR, &yes, sizeof(int)) == -1) {
-        perror("server: setsockopt");
-        exit(1);
-      }
-      if (bind(*sock_fd, p->ai_addr, p->ai_addrlen) == -1) {
-        printf("sa_family, sa_data, p->ai_addrlen: %d, %s, %d\n",
-                p->ai_addr->sa_family, p->ai_addr->sa_data, p->ai_addrlen);
+        if ((*sock_fd = socket(p->ai_family, p->ai_socktype, p->ai_protocol)) == -1) { 
+            perror("server: socket");
+            continue;
+        }
+        printf("socket num: %d\n", *sock_fd);
+        if (setsockopt(*sock_fd, SOL_SOCKET, SO_REUSEADDR, &yes, sizeof(int)) == -1) {
+            perror("server: setsockopt");
+            exit(1);
+        }
 
-        close(*sock_fd);
-        perror("server: bind");
-        continue;
-      } 
+        if (bind(*sock_fd, p->ai_addr, p->ai_addrlen) != -1) {
+            break;
+        } 
+        else {
+            close(*sock_fd);
+            perror("server: bind");
+        }
     }
+
     free(servinfo);
 
     return p;
 }
 
-void free_cmd(struct command *cmd) {
-    free(cmd->src);
-    free(cmd->dest);
-    free(cmd);
+int _get(int sockfd, struct command *cmd) {
+    return GET;
 }
 
-struct command * alloc_cmd(enum cmd_type type, char *src, char *dest) {
-    struct command *new_cmd;
+int _put(int sockfd, struct command *cmd) {
+    char buf[MAX_DATA_SIZE];
+    int remaining_bytes = cmd->fsz;
+    int num_bytes = 0;
+    FILE *file;
 
-    new_cmd = malloc(sizeof new_cmd);
-    new_cmd->src = strdup(src);
-    free(src);
-    new_cmd->dest = strdup(dest);
-    free(dest);
-
-    return new_cmd;
-}
-
-enum cmd_type get_type(char *cmd) {
-    if (0 == strncmp("put", cmd, 3)) {
-        return PUT;
-    }
-    else if (0 == strncmp("get", cmd, 3)) {
-        return GET;
-    }
-    else if (0 == strncmp("quit", cmd, 3)) {
-        return QUIT;
-    } 
-    else {
-        return INV;
-    }
-}
-
-struct command * parse_input() {
-    enum cmd_type cmd;
-    char **ap, *argv[TOKENS], *inputstring;
-    char line[CMD_LIMIT];
-
-    memset(line, 0, CMD_LIMIT); 
-    if (NULL == fgets(line, CMD_LIMIT, stdin)) {
-        return NULL;   
+    file = fopen(cmd->dest, "w");
+    if (NULL == file) {
+        fprintf(stderr, "Failed to open file %s.\n", cmd->dest);
+        return -1;
     }
 
-    for (ap = argv; (*ap = strsep(&inputstring, " \t")) != NULL;) {
-        if (**ap != '\0') {
-            if (++ap >= &argv[TOKENS]) {
-                break;
-            }
+    while (remaining_bytes > 0) {
+        if ((num_bytes = recv(sockfd, buf, MAX_DATA_SIZE-1, 0)) == -1) {
+            perror("recv");
+            return -1;
         }
+        if (num_bytes != fwrite(buf, 1, num_bytes, file)) {
+            fprintf(stderr, "Error writing file.\n");
+        }
+        remaining_bytes -= num_bytes;
     }
 
-    printf("arg1: %s, arg2: %s, arg3: %s\n", argv[0], argv[1], argv[2]);
-
-    if (INV == (cmd = get_type(argv[0]))) {
-        printf("Invalid command type '%s'", argv[0]);
-        return NULL;
-    }
-    if (strlen(argv[1]) < 1 || strlen(argv[1]) > MAX_FILENAME_LEN) {
-        printf("Invalid source filename '%s'", argv[1]);
-        return NULL;
-    }
-    if (strlen(argv[2]) < 1 || strlen(argv[2]) > MAX_FILENAME_LEN) {
-        printf("Invalid destination filename '%s'", argv[2]);
-        return NULL;
-    }
-
-    return alloc_cmd(cmd, argv[1], argv[2]);
-}
-
-void print_command(struct command *cmd) {
-    if (NULL == cmd) {
-        printf("NULL command.");
-    }
-    else {
-        printf("type: %d, source: %s, dest: %s", cmd->type, cmd->src, cmd->dest);
-    }
-}
-
-int get(char *local_file_name, char *remote_file_name) {
-  return GET;
-}
-
-int put(char *local_file_name, char *remote_file_name) {
-  return PUT;
-}
-
-void quit(void) {
-  exit(EXIT_FAILURE);
+    fclose(file);
+    return 0;
 }
 
 /** 
@@ -151,44 +90,51 @@ int main(int argc, char **argv) {
     socklen_t sin_size;
     struct addrinfo *servinfo;
     struct addrinfo *p;
+    char buf[MAX_DATA_SIZE];
     int sock_fd = 0; // listen on this fd
     int new_fd = 0; // listening for the child process
     int status;
     struct command *cmd;
     int yes = 1;
-    /* char hostname[1024]; */
+    int num_bytes = 0;
+    char hostname[HOSTNAME_LEN];
 
-    /* hostname[1023] = '\0'; */
-    /* gethostname(hostname, 1023); */
+	memset(&hints, 0, sizeof hints);
+	hints.ai_family = AF_UNSPEC;
+	hints.ai_socktype = SOCK_STREAM;
+	hints.ai_flags = AI_PASSIVE; // use my IP
 
-    memset(&hints, 0, sizeof hints);
-    hints.ai_family = AF_UNSPEC;
-    hints.ai_socktype = SOCK_STREAM;
-    hints.ai_flags = AI_PASSIVE;
-    
-    if ((status = getaddrinfo(NULL, PORT, &hints, &servinfo)) != 0) {
-        fprintf(stderr, "getaddrinfo error: %s\n", gai_strerror(status));
-        exit(1);
-    } 
-  
-    for(p = servinfo; p != NULL; p = p->ai_next) {
-        if ((sock_fd = socket(p->ai_family, p->ai_socktype, p->ai_protocol)) == -1) { 
-          perror("server: socket");
-          continue;
-        }
-        printf("socket num: %d\n", sock_fd);
-        if (setsockopt(sock_fd, SOL_SOCKET, SO_REUSEADDR, &yes, sizeof(int)) == -1) {
-          perror("server: setsockopt");
-          exit(1);
-        }
-        if (bind(sock_fd, p->ai_addr, p->ai_addrlen) == -1) {
-          close(sock_fd);
-          perror("server: bind");
-          continue;
-        } 
-    }
+	if ((status = getaddrinfo(NULL, PORT, &hints, &servinfo)) != 0) {
+		fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(status));
+		return 1;
+	}
 
-    free(servinfo);
+    gethostname(hostname, HOSTNAME_LEN);
+    printf("Running on host %s and port %s.\n", hostname, PORT);
+
+	// loop through all the results and bind to the first we can
+	for(p = servinfo; p != NULL; p = p->ai_next) {
+		if ((sock_fd = socket(p->ai_family, p->ai_socktype,
+				p->ai_protocol)) == -1) {
+			perror("server: socket");
+			continue;
+		}
+
+		if (setsockopt(sock_fd, SOL_SOCKET, SO_REUSEADDR, &yes,
+				sizeof(int)) == -1) {
+			perror("setsockopt");
+			exit(1); }
+
+		if (bind(sock_fd, p->ai_addr, p->ai_addrlen) == -1) {
+			close(sock_fd);
+			perror("server: bind");
+			continue;
+		}
+
+		break;
+	}
+
+	freeaddrinfo(servinfo); // all done with this structure
 
     if (p == NULL) {
         fprintf(stderr, "server: failed to bind to valid addrinfo");
@@ -209,28 +155,40 @@ int main(int argc, char **argv) {
             perror("accept");
             continue;
         } 
+
         void * in_addr = get_in_addr((struct sockaddr *)&their_addr);
         inet_ntop(their_addr.ss_family, in_addr, s, sizeof s);
     
         printf("server: got connection from %s\n", s); 
 
-        printf(USAGE);
-        cmd = parse_input();
-        while (NULL == (cmd = parse_input())) {
-            printf(USAGE);
+        if ((num_bytes = recv(new_fd, buf, MAX_DATA_SIZE-1, 0)) == -1) {
+            perror("recv");
+            exit(1);
         }
 
-        print_command(cmd);
+        buf[num_bytes] = '\0';
+        printf("server: received '%s'\n", buf);
+
+        if (NULL == (cmd = deserialize_cmd(buf))) {
+            fprintf(stderr, "Failed to deserialize the command.\n");
+            continue;
+        }
+
+        print_cmd(cmd);
+
+        if (cmd->type == PUT) {
+            _put(sock_fd, cmd);
+        }
+        else if (cmd->type == GET) {
+            _get(sock_fd, cmd);
+        }
+        else {
+           fprintf(stderr, "Invalid command format.\n");
+        }
 
         free(cmd);
 
-        if (send(new_fd, "Hello, world!", 13, 0) == -1) {
-            perror("send");
-        }
-        close(new_fd);
-
     }
+
     return 0;
 }
-
-

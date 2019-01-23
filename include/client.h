@@ -1,3 +1,5 @@
+#ifndef CLIENT_H
+#define CLIENT_H
 // Rowan MacLachlan
 // rdm695 22265820
 // CMPT 434 Derek Eager
@@ -10,8 +12,6 @@
 #include <stdlib.h>
 #include <string.h>
 
-int get(char *local_file_name, char *remote_file_name);
+#include "common.h"
 
-int put(char *local_file_name, char *remote_file_name);
-
-void quit(void);
+#endif // CLIENT_H

@@ -1,0 +1,182 @@
+\documentclass[10pt]{amsart}
+\usepackage{hyperref}
+\usepackage{parskip,fullpage}
+\usepackage{graphicx}
+\usepackage{amsmath}
+\usepackage{amsthm}
+\usepackage[T1]{fontenc}
+\usepackage{geometry}
+\usepackage{siunitx}
+\sisetup{output-exponent-marker=\ensuremath{\mathrm{e}}}
+
+\geometry{
+	body={7in, 9.5in},
+	left=.5in,
+	top=.50in
+}
+
+\newtheorem*{theorem}{Theorem}
+\newtheorem{lemma}{Lemma}
+\calclayout
+\begin{document}
+\textbf{CMPT 434 Assignment 1} \\
+Winter 2019\\
+Due Date: Saturday January 25th\\
+rdm659 11165820
+
+Part B
+
+\begin{enumerate}
+    \item (4 marks) Consider two nodes connected by a single dedicated link within an OCN (on- chip network), SAN (system/storage area network), LAN (local area network), or WAN (wide-area network), and suppose that we wish to transmit a single 100 byte (including header) packet from one node to the other. Calculate the total delay and the percentage of the total delay that is propagation delay for each network, assuming that:
+    \begin{itemize}
+        \item the link data rate is 4 Gbps (i.e., $4 x 109$ bps);
+        \item there is no queuing delay;
+        \item the total node processing delay (not overlapped with any other
+            component of delay) is x + (0.5 nanoseconds/byte), where x (the
+            portion of this delay that is independent of packet size) is 0
+            microseconds for the OCN, 0.3 microseconds for the SAN, 3
+            microseconds for the LAN, and 30 microseconds for the WAN; and
+        \item the link distances are 0.5 cm, 5m, 5000m, and 5000 km, for the
+            OCN, SAN, LAN, and WAN, respectively, with the speed of signal
+            propagation in each case equal to 200,000 km/s (approximately 2/3 of
+            the speed of light in a vacuum).
+    \end{itemize}
+
+    (Assuming the given measurements are infinitely precise.)
+    \begin{enumerate}
+        \item What is the node processing delay?
+        \begin{enumerate}
+            \item On the OCN?\\
+                $NPD_{OCN} = 100b * (0.5ns/b) = 50ns = \num{5.0e-8}s$
+            \item On the SAN?\\
+                $NPD_{SAN} = 0.3ns + (100b * 0.5ns/b) = 50.3ns = \num{5.3e-8}s$
+            \item On the LAN?\\
+                $NPD_{LAN} = 3\mu s + (100b * 0.5ns/b) = 3\mu s + 50ns = \num{3.05e-6}s$
+            \item On the WAN?\\
+                $NPD_{WAN} = 30\mu s + (100b * 0.5ns/b) = 30\mu s + 50ns = \num{3.005e-6}s$
+        \end{enumerate}
+        
+        \item What is the propagation delay?
+        \begin{enumerate}
+            \item On the OCN?\\
+                $PD_{OCN} = 0.005m / 200,000,000\si{\meter\per\second} = \num{2.5e-11}s$
+            \item On the SAN?\\
+                $PD_{SAN} = 5m / 200,000,000\si{\meter\per\second} = \num{2.5e-8}s$
+            \item On the LAN?\\
+                $PD_{LAN} = 5,000m / 200,000,000\si{\meter\per\second} = \num{2.5e-5}s$
+            \item On the WAN?\\
+                $PD_{WAN} = 5,000,000m / 200,000,000\si{\meter\per\second} = \num{2.5e-2}s$
+        \end{enumerate}
+        
+        \item What is the percentage of the total delay which is propagation delay?
+        \begin{enumerate}
+            \item On the OCN?\\
+                $OCN = PD_{OCN} / (PD_{OCN} + NPD_{OCN}) = \num{2.5e-11}s / (\num{2.5e-11}s
+                    + \num{5.0e-8}s) \approx 0.05\%$
+            \item On the SAN?\\
+                $SAN = PD_{SAN} / (PD_{SAN} + NPD_{SAN}) = \num{2.5e-8}s / (\num{2.5e-8}s +
+                    \num{5.3e-8}s) \approx 32\%$
+            \item On the LAN?\\
+                $LAN = PD_{LAN} / (PD_{LAN} + NPD_{LAN}) = \num{2.5e-5}s / (\num{2.5e-5}s +
+                    \num{3.05e-6}s) \approx 89\%$
+            \item On the WAN?\\
+                $WAN = PD_{WAN} / (PD_{WAN} + NPD_{WAN}) = \num{2.5e-2}s / (\num{2.5e-2}s +
+                    \num{3.005e-6}s) \approx 100\%$
+        \end{enumerate}
+    \end{enumerate}
+
+    \item (4 marks) Consider a message consisting of n packets, each of 1000
+        bytes (including header), that traverses 4 links in a store-and-forward
+        packet-switched network (i.e., there are 3 intermediate nodes between
+        the source and destination that the message passes through). The
+        propagation delay on each link is 1 ms. The transmission rate on each
+        link is 100 Mbps (i.e., 100 x 106 bps). Neglecting processing and
+        queueing delays, and assuming that the packets are sent back-to-back
+        without intervening delays, give the total delay from when the first bit
+        is sent at the source until all packets have been completely received at
+        the destination for the following values of n:
+    \begin{enumerate}
+        \item $n = 1$\\
+        The propagation delay between the sender and receiver on this network is $4 * 1ms = 4ms = 0.004s$.\\
+        Total message size is $1000 bytes * 8bits/byte = 8000 bits$.\\
+        The transmission rate is $100Mbps = 100000000bps$\\
+        Then it takes $8000b / 100000000bps = \num{8e-5}s$ to get the last bit on the wire.\\
+        Consider the last bit sent from the receiver.  It get on the wire after
+            $\num{8e-5}s$.  It takes $1ms$ to get to the next node.\\
+        This is repeated 4 times before the last bit is received at its
+            destination.  Then, the total delay is $4 * (\num{8e-5}s +
+            \num{1e-3}s) = \num{4.32e-3}s$
+        \item $n = 12$\\
+        If the total amount of data is increased 12 fold, then we should expect
+            the only thing to change is the total message size.\\
+        Now, the total message size is $1000bytes/message * 8 bits/byte * 12 messages = 96000bits$.\\
+        Then, it takes $96000b / 100000000bps = \num{9.6e-4}s$ for the last bit
+            to get on the wire, and the total delay will then be $4 *
+            (\num{9.6e-4}s + \num{1e-3}s) = \num{7.84e-3}s$
+    \end{enumerate}
+
+    \item (4 marks) Give the maximum data rate, as measured in Kbps, for transmissions on a channel with bandwidth H = 400 KHz and a signal to noise ratio of 63, for each of the following two cases. (Hint: for each case, use whichever of Nyquist’s theorem and Shannon’s theorem imposes the tightest constraint.)
+    \begin{enumerate}
+        \item Each transmitted symbol has 2 possible values (i.e., transmits just a single bit)\\
+            According to Nyquist's Theorem, the maximum symbol rate is $baud =
+            2H = 800Kbps$ symbols per second.  Then, the baud is also the
+            maximum data rate because there is only 1 bit per symbol.\\
+            According to Shannon's Theorem, the maximum bps is
+            $400,000Hz*\log{2}{1 + 63}$ which gives $bps_{max} = 400,000*6 =
+            2,400Kbps$\\ In this case, Nyquist's Theorem places the greatest
+            constraint on the maximum data rate.\\
+        \item Each transmitted symbol has 32 possible values.\\
+            With Nyquist's Theorem, the maximum symbol rate is $baud = 2H =
+            800K$ symbols per second.  Then, the $bps_{max} = 800K * 32 =
+            25,600Kbps$\\
+            With to Shannon's Theorem, we find the same result, and the
+            $bps_{max} = 2,400Kbps$\\ In this case, Shannon's Theorem places the
+            greatest constraint on the maximum data rate.\\
+    \end{enumerate}
+    \item (4 marks) Consider a scenario in which 100 sessions share a link of data
+    rate 100 Mbps (i.e., 100 x 106 bps). Suppose that each session alternates
+    between idle periods (when no data is being sent) of average duration 1
+    second, and busy periods of average duration B.
+    \begin{enumerate}
+        \item Supposing that circuit switching is used (i.e., channel capacity
+            is evenly divided among the sessions, with a session’s allocated
+            capacity unused when the session is idle), give the achievable data
+            transmission rate a session can achieve during its busy period.
+        \item Give an estimate of the average achievable data rate of each
+            session (during its busy period) when packet switching is used, for
+            B = 10 seconds, B = 1 second, B = 100 milliseconds, and B = 10
+            milliseconds, assuming:
+        \begin{itemize}
+            \item at each point in time the link capacity is shared approximately
+                equally among all of the sessions currently in their busy period; and
+            \item when a given session is in its busy period, the number of other busy
+                sessions can be approximated by the total number of other sessions (99)
+                times the fraction of time that each is in its busy period.
+        \end{itemize}
+            $99 * ( B / I + B )$ <- average busy period 
+            $1Gbps / 1 + (99 * ( B / I + B )$ <- average achievable data rate
+            for busy session.
+    \end{enumerate}
+    \item (8 marks) Consider a source and destination pair connected by a network
+        path of capacity 100 Mbps and a round-trip time of 100 ms (measured from
+        when the source transmits the first bit of a packet until the destination’s
+        ack is received). Assume a packet size of 1000 bytes, and that the loss
+        probability is negligibly small.
+    \begin{enumerate}
+        \item Give the maximum achievable data transfer rate in Mbps, assuming
+            use of the stop- and-wait reliable data transfer protocol.
+        \item Give the maximum achievable data transfer rate in Mbps, assuming
+            use of a sliding window reliable data transfer protocol with maximum
+            sending window sizes of 10 and 1000.
+        \item Assuming again use of a sliding window protocol, how big would the
+            maximum sending window have to be to get a maximum achievable data
+            transfer rate equal to the network path capacity of 100 Mbps?
+        \item Under what circumstances, given these values for capacity,
+            round-trip time, and packet size, could it be beneficial to have a
+            maximum sending window size larger than that given in your answer to
+            part (c)?
+    \end{enumerate}
+\end{enumerate}
+
+
+\end{document}

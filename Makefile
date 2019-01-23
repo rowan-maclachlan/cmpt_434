@@ -15,7 +15,7 @@ ARCH := $(shell uname -m)
 MAC_OS="Darwin"
 LINUX_OS="Linux"
 ########################################
-TARGET = server client beej_s beej_c
+TARGET = server client beej_s beej_c test
 ########################################
 # Directories
 OBJ = ./obj/
@@ -26,7 +26,8 @@ $(shell mkdir -p $(OBJ))
 # Compiler and linker options
 CC = gcc
 AR_OPTIONS = cr
-C_FLAGS = -Wall -pedantic -g -I$(INC)
+C_FLAGS = -Wall -pedantic -g
+INC_FLAGS = -I$(INC)
 ########################################
 
 # Filename macroes
@@ -42,7 +43,8 @@ BEEJ_H =
 BEEJ_S_OBJ = $(OBJ)beej_s.o
 BEEJ_C_OBJ = $(OBJ)beej_c.o
 # all
-ALL_OBJ = $(CLIENT_OBJ) $(SERVER_OBJ) $(COMMON_OBJ) $(TEST_OBJ)
+ALL_OBJ = $(CLIENT_OBJ) $(SERVER_OBJ) $(COMMON_OBJ) $(TEST_OBJ) \
+		  $(BEEJ_S_OBJ) $(BEEJ_C_OBJ)
 ALL_H = $(CLIENT_H) $(SERVER_H) $(COMMON_H)
 EXEC = server client beej_s beej_c
 ########################################
@@ -52,10 +54,10 @@ EXEC = server client beej_s beej_c
 all: $(TARGET)
 
 # SERVER 
-server : $(SERVER_OBJ)
+server : $(SERVER_OBJ) $(COMMON_OBJ)
 	$(CC) $^ -o $@ 
 # CLIENT
-client : $(CLIENT_OBJ)
+client : $(CLIENT_OBJ) $(COMMON_OBJ)
 	$(CC) $^ -o $@ 
 # BEEJ SERVER
 beej_s : $(BEEJ_S_OBJ)
@@ -64,23 +66,26 @@ beej_s : $(BEEJ_S_OBJ)
 beej_c : $(BEEJ_C_OBJ)
 	$(CC) $^ -o $@
 # TEST 
-test : $(TEST_OBJ)
+test : $(TEST_OBJ) $(COMMON_OBJ)
 	$(CC) $^ -o $@ 
 
 # SERVER OBJ FILES
 $(SERVER_OBJ) : $(SRC)server.c $(SERVER_H) $(COMMON_H)
-	$(CC) $(C_FLAGS) -c $< -o $@
+	$(CC) $(INC_FLAGS) $(C_FLAGS) -c $< -o $@
 # CLIENT OBJ FILES
 $(CLIENT_OBJ) : $(SRC)client.c $(CLIENT_H) $(COMMON_H)
-	$(CC) $(C_FLAGS) -c $< -o $@
+	$(CC) $(INC_FLAGS) $(C_FLAGS) -c $< -o $@
+# COMMON OBJ FILES
+$(COMMON_OBJ) : $(SRC)common.c $(COMMON_H)
+	$(CC) $(INC_FLAGS) $(C_FLAGS) -c $< -o $@
 # BEEJ OBJ FILES
 $(BEEJ_S_OBJ) : $(SRC)beej_s.c $(BEEJ_H)
 	$(CC) $(C_FLAGS) -c $< -o $@
 $(BEEJ_C_OBJ) : $(SRC)beej_c.c $(BEEJ_H)
 	$(CC) $(C_FLAGS) -c $< -o $@
 # TEST OBJ FILES
-$(TEST_OBJ) : $(SRC)test.c $(ALL_H) 
-	$(CC) $(C_FLAGS) -c $< -o $@
+$(TEST_OBJ) : $(SRC)test.c $(COMMON_H) 
+	$(CC) $(INC_FLAGS) $(C_FLAGS) -c $< -o $@
 clean:
 	rm -f $(ALL_OBJ) 
 	rmdir $(OBJ)
