@@ -25,7 +25,7 @@ struct addrinfo * find_server(int *sock_fd, struct addrinfo *servinfo) {
     struct addrinfo *p;
 
     for(p = servinfo; p != NULL; p = p->ai_next) {
-        if ((*sock_fd = socket(p->ai_family, p->ai_socktype, p->ai_protocol)) == -1) { 
+        if ((*sock_fd = socket(p->ai_family, p->ai_socktype, p->ai_protocol)) == -1) {
             perror("server: socket");
             continue;
         }
@@ -37,7 +37,7 @@ struct addrinfo * find_server(int *sock_fd, struct addrinfo *servinfo) {
 
         if (bind(*sock_fd, p->ai_addr, p->ai_addrlen) != -1) {
             break;
-        } 
+        }
         else {
             close(*sock_fd);
             perror("server: bind");
@@ -59,7 +59,7 @@ int _put(int sockfd, struct command *cmd) {
 
     file = fopen(cmd->dest, "w");
     if (NULL == file) {
-        perror("server: fopen(cmd->dest, \"w\")"); 
+        perror("server: fopen(cmd->dest, \"w\")");
         cmd->err = FILE_CANT_WRITE;
         send_cmd(sockfd, cmd);
         return -1;
@@ -95,7 +95,7 @@ int _get(int sockfd, struct command *cmd) {
 
     fseek(file, 0L, SEEK_END);
     cmd->fsz = ftell(file);
-    fseek(file, 0L, SEEK_SET); 
+    fseek(file, 0L, SEEK_SET);
     if (cmd->fsz > MAX_DATA_SIZE) {
         fprintf(stderr, "Filesize exceeds limits.\n");
         cmd->err = FILE_OVERSIZE;
@@ -120,7 +120,7 @@ int _get(int sockfd, struct command *cmd) {
     return n_remaining;
 }
 
-/** 
+/**
  * From Beej's Guide to Network Programming.
  */
 int main(int argc, char **argv) {
@@ -178,32 +178,32 @@ int main(int argc, char **argv) {
         fprintf(stderr, "server: failed to bind to valid addrinfo");
         exit(1);
     }
-    
+
     if (listen(sock_fd, BACKLOG) == -1) {
         perror("listen");
         exit(1);
     }
-    
+
     printf("server: waiting for connections...\n");
-   
- 
+
+
     while(1) {
-        sin_size = sizeof their_addr; 
-        new_fd = accept(sock_fd, (struct sockaddr *)&their_addr, &sin_size); 
+        sin_size = sizeof their_addr;
+        new_fd = accept(sock_fd, (struct sockaddr *)&their_addr, &sin_size);
         if (new_fd == -1) {
             perror("accept");
             continue;
-        } 
-    
+        }
+
         set_timeout(new_fd);
-        
+
         void * in_addr = get_in_addr((struct sockaddr *)&their_addr);
         inet_ntop(their_addr.ss_family, in_addr, s, sizeof s);
-        
-        printf("server: got connection from %s...\n", s); 
+
+        printf("server: got connection from %s...\n", s);
 
         while(1) {
-            printf("server: waiting for commands...\n"); 
+            printf("server: waiting for commands...\n");
 
             if (-1 == recv_cmd(new_fd, &cmd)) {
                 fprintf(stderr, "Error: server: failed to receive command.\n");
@@ -229,6 +229,6 @@ int main(int argc, char **argv) {
 
         close(new_fd);
     }
-    
+
     return 0;
 }
