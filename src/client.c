@@ -69,6 +69,7 @@ int _get(int sockfd, struct command *cmd) {
         return -1;
     }
 
+    // send get request
     cmd->fsz = 0;
     send_cmd(sockfd, cmd);
 
@@ -85,6 +86,7 @@ int _get(int sockfd, struct command *cmd) {
         return -1;
     }
 
+    // Receive file contents
     if (0 != (n_remaining = recv_write_file(sockfd, file, cmd->fsz))) {
         fprintf(stderr, "Error: client: failed to receive/write file.\n");
     }
@@ -158,6 +160,8 @@ int main(int argc, char **argv) {
     printf("client: connecting to %s\n", s);
 
     freeaddrinfo(servinfo); // all done with this structure
+
+    set_timeout(sockfd);
 
     while(1) {
         printf("Enter command of the form '%s':\n", USAGE);

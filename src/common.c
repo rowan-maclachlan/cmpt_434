@@ -52,9 +52,9 @@ char *_from_type(enum cmd_type cmd_type) {
 }
 
 int _deserialize_cmd(char *cmd_buf, struct command **cmd) {
-    char type[MAX_FILENAME_LEN] = { 0 };
-    char src[MAX_FILENAME_LEN] = { 0 };
-    char dest[MAX_FILENAME_LEN] = { 0 };
+    char type[MAX_FILENAME_LEN] = { '\0' };
+    char src[MAX_FILENAME_LEN] = { '\0' };
+    char dest[MAX_FILENAME_LEN] = { '\0' };
     size_t size = 0;
     enum error err = 0;
 
@@ -127,7 +127,7 @@ int recv_cmd(int sockfd, struct command **cmd) {
 }
 
 void send_cmd(int sockfd, struct command *cmd) {
-    char cmd_buf[CMD_LIMIT] = { 0 };
+    char cmd_buf[CMD_LIMIT] = { '\0' };
     _serialize_cmd(cmd_buf, cmd); 
     printf("Process %d sent serialized command '%s'\n", getpid(), cmd_buf);
     send(sockfd, cmd_buf, strlen(cmd_buf), 0);
@@ -168,7 +168,7 @@ void free_cmd(struct command *cmd) {
 }
 
 char * get_input(char *buf) {
-    memset(buf, 0, CMD_LIMIT); 
+    memset(buf, '\0', CMD_LIMIT); 
 
     // get input
     if (NULL == fgets(buf, CMD_LIMIT, stdin)) {
@@ -184,9 +184,9 @@ char * get_input(char *buf) {
 
 struct command * parse_cmd(char *buf) {
     struct command *cmd = NULL;
-    char type[MAX_FILENAME_LEN] = { 0 };
-    char src[MAX_FILENAME_LEN] = { 0 };
-    char dest[MAX_FILENAME_LEN] = { 0 };
+    char type[MAX_FILENAME_LEN] = { '\0' };
+    char src[MAX_FILENAME_LEN] = { '\0' };
+    char dest[MAX_FILENAME_LEN] = {'\0' };
 
     if (NULL == buf) {
         fprintf(stderr, "Provided buffer is NULL, exiting...\n");
@@ -226,6 +226,14 @@ void print_cmd(struct command *cmd) {
         printf("type: %d, source: %s, dest: %s, size: %zu, err: %u\n",
                 cmd->type, cmd->src, cmd->dest, cmd->fsz, cmd->err);
     }
+}
+
+void set_timeout(int sockfd) {
+    struct timeval tv;
+    // Set timeout
+    tv.tv_sec = TIMEOUT;
+    tv.tv_usec = 0;
+    setsockopt(sockfd, SOL_SOCKET, SO_RCVTIMEO, (const char*)&tv, sizeof tv);
 }
 
 /**

@@ -9,6 +9,7 @@
 
 #define MAX_DATA_SIZE 1024 // max number of bytes we can get at once
 #define CMD_LIMIT 256
+#define TIMEOUT 10
 
 enum cmd_type {
     QUIT = 0,
@@ -50,6 +51,8 @@ char * get_input(char *buf);
 void print_cmd(struct command *cmd);
 
 struct command * parse_cmd(char *buf);
+
+void set_timeout(int sockfd);
 
 void * get_in_addr(struct sockaddr *sa);
 

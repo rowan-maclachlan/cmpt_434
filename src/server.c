@@ -195,6 +195,8 @@ int main(int argc, char **argv) {
             continue;
         } 
     
+        set_timeout(new_fd);
+        
         void * in_addr = get_in_addr((struct sockaddr *)&their_addr);
         inet_ntop(their_addr.ss_family, in_addr, s, sizeof s);
         
