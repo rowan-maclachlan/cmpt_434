@@ -16,7 +16,7 @@
 #include "server.h"
 #include "common.h"
 
-#define PORT "3490"
+#define PORT "32000"
 #define BACKLOG 10
 #define HOSTNAME_LEN 256
 
@@ -194,8 +194,6 @@ int main(int argc, char **argv) {
             perror("accept");
             continue;
         }
-
-        set_timeout(new_fd);
 
         void * in_addr = get_in_addr((struct sockaddr *)&their_addr);
         inet_ntop(their_addr.ss_family, in_addr, s, sizeof s);
