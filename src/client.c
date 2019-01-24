@@ -32,20 +32,20 @@ int _put(int sockfd, struct command *cmd) {
 
     fseek(file, 0L, SEEK_END);
     cmd->fsz = ftell(file);
-    fseek(file, 0L, SEEK_SET); 
+    fseek(file, 0L, SEEK_SET);
     if (cmd->fsz > MAX_DATA_SIZE) {
         fprintf(stderr, "Filesize exceeds limits.\n");
         return -1;
     }
-    
+
     // Send put request
     send_cmd(sockfd, cmd);
-    // Recieve handshake 
+    // Recieve handshake
     if (-1 == recv_cmd(sockfd, &cmd)) {
         fprintf(stderr, "Error: client: failed to receive handshake command.\n");
         return -1;
     }
-    
+
     if (FILE_OK != cmd->err) {
         fprintf(stderr, "Error: client: request: %d.\n", cmd->err);
         return -1;
@@ -72,13 +72,13 @@ int _get(int sockfd, struct command *cmd) {
     cmd->fsz = 0;
     send_cmd(sockfd, cmd);
 
-    // Recieve handshake 
+    // Recieve handshake
     if (-1 == recv_cmd(sockfd, &cmd)) {
         fprintf(stderr, "Error: client: failed to receive handshake command.\n");
         fclose(file);
         return -1;
     }
-    
+
     if (FILE_OK != cmd->err) {
         fprintf(stderr, "Error: client: request: %d.\n", cmd->err);
         fclose(file);
@@ -105,58 +105,60 @@ int main(int argc, char **argv) {
     char hostname[HOSTNAME_SIZE];
     char cmd_buf[CMD_LIMIT];
     struct command *cmd;
-  
+
     memset(&hints, 0, sizeof hints);
     hints.ai_family = AF_UNSPEC;
     hints.ai_socktype = SOCK_STREAM;
     hints.ai_flags = AI_PASSIVE;
-    
+
     if (argc != 3) {
         printf("Usage: %s <host name> <port number>", argv[0]);
         exit(1);
     }
     else {
-        strlcpy(hostname, argv[1], strlen(argv[1])+1);
-        strlcpy(port, argv[2], strlen(argv[2])+1);
+        strncpy(hostname, argv[1], strlen(argv[1]));
+        hostname[strlen(argv[1])] = '\0';
+        strncpy(port, argv[2], strlen(argv[2]));
+        port[strlen(argv[2])] = '\0';
         printf("Using hostname %s and port %s\n", hostname, port);
-    } 
-    
+    }
+
     memset(&hints, 0, sizeof hints);
     hints.ai_family = AF_UNSPEC;
     hints.ai_socktype = SOCK_STREAM;
-    
+
     if ((status = getaddrinfo(hostname, port, &hints, &servinfo)) != 0) {
         fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(status));
         exit(1);
     }
-    
+
     // loop through all the results and connect to the first we can
     for(p = servinfo; p != NULL; p = p->ai_next) {
         if ((sockfd = socket(p->ai_family, p->ai_socktype, p->ai_protocol)) == -1) {
             perror("client: socket");
             continue;
         }
-        
+
         if (connect(sockfd, p->ai_addr, p->ai_addrlen) == -1) {
             perror("client: connect");
             close(sockfd);
             continue;
         }
-        
+
         break;
     }
-    
+
     if (p == NULL) {
         fprintf(stderr, "client: failed to connect\n");
         exit(2);
     }
-    
+
     inet_ntop(p->ai_family, get_in_addr((struct sockaddr *)p->ai_addr),
               s, sizeof s);
     printf("client: connecting to %s\n", s);
-    
+
     freeaddrinfo(servinfo); // all done with this structure
-    
+
     while(1) {
         printf("Enter command of the form '%s':\n", USAGE);
 
@@ -167,7 +169,7 @@ int main(int argc, char **argv) {
         if (NULL == cmd || cmd->type == INV) {
             fprintf(stderr, "Poorly formed command.  Try again.\n");
             continue;
-        }            
+        }
         else if (cmd->type == PUT) {
             _put(sockfd, cmd);
         }
@@ -181,8 +183,8 @@ int main(int argc, char **argv) {
 
         free(cmd);
     }
-    
+
     close(sockfd);
-  
+
     exit(EXIT_SUCCESS);
 }
