@@ -35,21 +35,9 @@ int main(int argc, char **argv) {
 
         printf("Enter command of the form '%s':\n", USAGE);
 
-        get_input(buf);
-        printf("parsing buffer %s with length %lu\n", buf, strlen(buf));
-        if (3 != sscanf(buf, "%s %s %s", type, src, dest)) {
-            fprintf(stderr, "Failed to make all assignments.  Try again.\n");
-            continue;
-        }
-        printf("%s, %s, %s\n", type, src, dest);
-
-        cmd = malloc(sizeof cmd);
-        cmd->type = PUT;
-        cmd->src = strndup(src, strlen(src) + 1);
-        cmd->dest = strndup(dest, strlen(dest) + 1);
+        cmd = parse_cmd(get_input(buf));
         print_cmd(cmd);
 
-        serialize_cmd(ser, cmd);
         printf("\nClient sending command '%s' with length %lu\n", ser, strlen(ser));
 
         free(cmd);

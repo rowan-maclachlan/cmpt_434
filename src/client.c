@@ -22,40 +22,76 @@
 
 int _put(int sockfd, struct command *cmd) {
     FILE *file;
-    char cmd_buf[CMD_LIMIT];
-    char file_buf[MAX_DATA_SIZE];
-    size_t n_read;
-    size_t sz;
+    size_t n_remaining;
 
     file = fopen(cmd->src, "r");
     if (NULL == file) {
-        fprintf(stderr, "Failed to open file %s.\n", cmd->src);
+        perror("fopen");
         return -1;
     }
 
     fseek(file, 0L, SEEK_END);
-    sz = ftell(file);
+    cmd->fsz = ftell(file);
     fseek(file, 0L, SEEK_SET); 
-    if (sz > MAX_DATA_SIZE) {
+    if (cmd->fsz > MAX_DATA_SIZE) {
         fprintf(stderr, "Filesize exceeds limits.\n");
         return -1;
     }
     
-    cmd->fsz = sz;
-    serialize_cmd(cmd_buf, cmd); 
-    send(sockfd, cmd_buf, strlen(cmd_buf), 0);
+    // Send put request
+    send_cmd(sockfd, cmd);
+    // Recieve handshake 
+    if (-1 == recv_cmd(sockfd, &cmd)) {
+        fprintf(stderr, "Error: client: failed to receive handshake command.\n");
+        return -1;
+    }
+    
+    if (FILE_OK != cmd->err) {
+        fprintf(stderr, "Error: client: request: %d.\n", cmd->err);
+        return -1;
+    }
 
-    while ((n_read = fread(file_buf, 1, sizeof file_buf, file)) > 0) {
-        send(sockfd, file_buf, n_read, 0);
+    // send file contents
+    n_remaining = send_file(file, sockfd, cmd->fsz);
+
+    fclose(file);
+
+    return n_remaining;
+}
+
+int _get(int sockfd, struct command *cmd) {
+    FILE *file;
+    size_t n_remaining = 0;
+
+    file = fopen(cmd->dest, "w");
+    if (NULL == file) {
+        perror("fopen");
+        return -1;
+    }
+
+    cmd->fsz = 0;
+    send_cmd(sockfd, cmd);
+
+    // Recieve handshake 
+    if (-1 == recv_cmd(sockfd, &cmd)) {
+        fprintf(stderr, "Error: client: failed to receive handshake command.\n");
+        fclose(file);
+        return -1;
+    }
+    
+    if (FILE_OK != cmd->err) {
+        fprintf(stderr, "Error: client: request: %d.\n", cmd->err);
+        fclose(file);
+        return -1;
+    }
+
+    if (0 != (n_remaining = recv_write_file(sockfd, file, cmd->fsz))) {
+        fprintf(stderr, "Error: client: failed to receive/write file.\n");
     }
 
     fclose(file);
 
-    return 0;
-}
-
-int _get(int sockfd, struct command *cmd) {
-    return 0;
+    return n_remaining;
 }
 
 int main(int argc, char **argv) {
@@ -124,13 +160,15 @@ int main(int argc, char **argv) {
     while(1) {
         printf("Enter command of the form '%s':\n", USAGE);
 
-        cmd = deserialize_cmd(get_input(cmd_buf));
+        cmd = parse_cmd(get_input(cmd_buf));
+
+        print_cmd(cmd);
+
         if (NULL == cmd || cmd->type == INV) {
             fprintf(stderr, "Poorly formed command.  Try again.\n");
             continue;
         }            
-
-        if (cmd->type == PUT) {
+        else if (cmd->type == PUT) {
             _put(sockfd, cmd);
         }
         else if (cmd->type == GET) {

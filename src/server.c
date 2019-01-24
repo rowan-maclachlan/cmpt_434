@@ -49,35 +49,75 @@ struct addrinfo * find_server(int *sock_fd, struct addrinfo *servinfo) {
     return p;
 }
 
-int _get(int sockfd, struct command *cmd) {
-    return GET;
-}
-
+/**
+ * Returns  -1 If there is an error with the request
+ *          or the number of bytes we failed to receive and write successfully
+ */
 int _put(int sockfd, struct command *cmd) {
-    char buf[MAX_DATA_SIZE];
-    int remaining_bytes = cmd->fsz;
-    int num_bytes = 0;
     FILE *file;
+    int n_remaining = 0;
 
     file = fopen(cmd->dest, "w");
     if (NULL == file) {
-        fprintf(stderr, "Failed to open file %s.\n", cmd->dest);
+        perror("server: fopen(cmd->dest, \"w\")"); 
+        cmd->err = FILE_CANT_WRITE;
+        send_cmd(sockfd, cmd);
         return -1;
     }
 
-    while (remaining_bytes > 0) {
-        if ((num_bytes = recv(sockfd, buf, MAX_DATA_SIZE-1, 0)) == -1) {
-            perror("recv");
-            return -1;
-        }
-        if (num_bytes != fwrite(buf, 1, num_bytes, file)) {
-            fprintf(stderr, "Error writing file.\n");
-        }
-        remaining_bytes -= num_bytes;
+    cmd->err = FILE_OK;
+    send_cmd(sockfd, cmd);
+
+    if (0 != (n_remaining = recv_write_file(sockfd, file, cmd->fsz))) {
+        fprintf(stderr, "Error: server: failed to receive/write file.\n");
     }
 
     fclose(file);
-    return 0;
+
+    return n_remaining;
+}
+
+/**
+ * Returns  -1 If there is an error with the request
+ *          or the number of bytes we failed to receive and write successfully
+ */
+int _get(int sockfd, struct command *cmd) {
+    FILE *file;
+    size_t n_remaining = 0;
+
+    file = fopen(cmd->src, "r");
+    if (NULL == file) {
+        perror("server: fopen(cmd->src, \"r\")");
+        cmd->err = FILE_CANT_READ;
+        send_cmd(sockfd, cmd);
+        return -1;
+    }
+
+    fseek(file, 0L, SEEK_END);
+    cmd->fsz = ftell(file);
+    fseek(file, 0L, SEEK_SET); 
+    if (cmd->fsz > MAX_DATA_SIZE) {
+        fprintf(stderr, "Filesize exceeds limits.\n");
+        cmd->err = FILE_OVERSIZE;
+        send_cmd(sockfd, cmd);
+        fclose(file);
+        return -1;
+    }
+    else if (cmd->fsz <= 0) {
+        fprintf(stderr, "Filesize is 0.\n");
+        cmd->err = FILE_EMPTY;
+        send_cmd(sockfd, cmd);
+        fclose(file);
+        return -1;
+    }
+
+    cmd->err = FILE_OK;
+    send_cmd(sockfd, cmd);
+    n_remaining = send_file(file, sockfd, cmd->fsz);
+
+    fclose(file);
+
+    return n_remaining;
 }
 
 /** 
@@ -90,13 +130,11 @@ int main(int argc, char **argv) {
     socklen_t sin_size;
     struct addrinfo *servinfo;
     struct addrinfo *p;
-    char buf[MAX_DATA_SIZE];
     int sock_fd = 0; // listen on this fd
     int new_fd = 0; // listening for the child process
     int status;
-    struct command *cmd;
+    struct command *cmd = NULL;
     int yes = 1;
-    int num_bytes = 0;
     char hostname[HOSTNAME_LEN];
 
 	memset(&hints, 0, sizeof hints);
@@ -105,7 +143,7 @@ int main(int argc, char **argv) {
 	hints.ai_flags = AI_PASSIVE; // use my IP
 
 	if ((status = getaddrinfo(NULL, PORT, &hints, &servinfo)) != 0) {
-		fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(status));
+		perror("server: getaddrinfo");
 		return 1;
 	}
 
@@ -147,7 +185,8 @@ int main(int argc, char **argv) {
     }
     
     printf("server: waiting for connections...\n");
-    
+   
+ 
     while(1) {
         sin_size = sizeof their_addr; 
         new_fd = accept(sock_fd, (struct sockaddr *)&their_addr, &sin_size); 
@@ -155,40 +194,39 @@ int main(int argc, char **argv) {
             perror("accept");
             continue;
         } 
-
+    
         void * in_addr = get_in_addr((struct sockaddr *)&their_addr);
         inet_ntop(their_addr.ss_family, in_addr, s, sizeof s);
-    
-        printf("server: got connection from %s\n", s); 
+        
+        printf("server: got connection from %s...\n", s); 
 
-        if ((num_bytes = recv(new_fd, buf, MAX_DATA_SIZE-1, 0)) == -1) {
-            perror("recv");
-            exit(1);
+        while(1) {
+            printf("server: waiting for commands...\n"); 
+
+            if (-1 == recv_cmd(new_fd, &cmd)) {
+                fprintf(stderr, "Error: server: failed to receive command.\n");
+                break;
+            }
+
+            if (cmd->type == PUT) {
+                if (0 != _put(new_fd, cmd)) {
+                    fprintf(stderr, "Error: server: failed to execute put command.\n");
+                }
+            }
+            else if (cmd->type == GET) {
+                if (0 != _get(new_fd, cmd)) {
+                    fprintf(stderr, "Error: server: failed to execute put command.\n");
+                }
+            }
+            else {
+               fprintf(stderr, "Invalid command format.\n");
+            }
+
+            free(cmd);
         }
 
-        buf[num_bytes] = '\0';
-        printf("server: received '%s'\n", buf);
-
-        if (NULL == (cmd = deserialize_cmd(buf))) {
-            fprintf(stderr, "Failed to deserialize the command.\n");
-            continue;
-        }
-
-        print_cmd(cmd);
-
-        if (cmd->type == PUT) {
-            _put(sock_fd, cmd);
-        }
-        else if (cmd->type == GET) {
-            _get(sock_fd, cmd);
-        }
-        else {
-           fprintf(stderr, "Invalid command format.\n");
-        }
-
-        free(cmd);
-
+        close(new_fd);
     }
-
+    
     return 0;
 }
