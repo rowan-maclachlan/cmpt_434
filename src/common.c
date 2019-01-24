@@ -109,7 +109,7 @@ int _serialize_cmd(char *buf, struct command *cmd) {
 }
 
 int recv_cmd(int sockfd, struct command **cmd) {
-    char cmd_buf[CMD_LIMIT] = { 0 };
+    char cmd_buf[CMD_LIMIT] = { '\0' };
 
     if (recv(sockfd, cmd_buf, CMD_LIMIT, 0) == -1) {
         perror("recv");
