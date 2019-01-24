@@ -30,7 +30,7 @@ enum cmd_type _get_type(char *cmd) {
     }
     else if (0 == strncmp("quit", cmd, 3)) {
         return QUIT;
-    } 
+    }
     else {
         return INV;
     }
@@ -73,11 +73,19 @@ int _deserialize_cmd(char *cmd_buf, struct command **cmd) {
         *cmd = NULL;
         return -1;
     }
+
     (*cmd)->type = _get_type(type);
-    (*cmd)->src = strdup(src);
-    (*cmd)->dest = strdup(dest);
+    (*cmd)->src = strndup(src, strlen(src) + 1);
+    (*cmd)->dest = strndup(dest, strlen(dest) + 1);
     (*cmd)->fsz = size;
     (*cmd)->err = err;
+
+    if (NULL == *cmd ||
+           0 == strcmp((*cmd)->src, "") ||
+           0 == strcmp((*cmd)->dest, "")) {
+        fprintf(stderr, "Error: Process %d failed to deserialize the command.\n", getpid());
+        return -1;
+    }
 
     return 0;
 }
@@ -88,7 +96,7 @@ int _recv_file(char *buf, int sockfd) {
     if ((num_bytes = recv(sockfd, buf, MAX_DATA_SIZE-1, 0)) == -1) {
         perror("recv");
         return -1;
-    } 
+    }
 
     return num_bytes;
 }
@@ -98,7 +106,7 @@ int _write_file(char *buf, FILE *file_to_write, size_t n_write) {
 
     if (n_write != (n_written = fwrite(buf, 1, n_write, file_to_write))) {
         perror("fwrite");
-    } 
+    }
 
     return n_written;
 }
@@ -122,13 +130,21 @@ int recv_cmd(int sockfd, struct command **cmd) {
         fprintf(stderr, "Error: Process %d failed to deserialize the command.\n", getpid());
         return -1;
     }
-    
+
+    if (*cmd == NULL ||
+            0 == strcmp((*cmd)->src, "") ||
+            0 == strcmp((*cmd)->dest, "")) {
+        fprintf(stderr, "Error: Process %d failed to deserialize the command.\n", getpid());
+        return -1;
+    }
+
+
     return 0;
 }
 
 void send_cmd(int sockfd, struct command *cmd) {
     char cmd_buf[CMD_LIMIT] = { '\0' };
-    _serialize_cmd(cmd_buf, cmd); 
+    _serialize_cmd(cmd_buf, cmd);
     printf("Process %d sent serialized command '%s'\n", getpid(), cmd_buf);
     send(sockfd, cmd_buf, strlen(cmd_buf), 0);
 }
@@ -153,7 +169,7 @@ size_t recv_write_file(int sockfd, FILE *file, size_t n_remaining) {
     size_t n_write = 0;
     char file_buf[MAX_DATA_SIZE];
     while(n_remaining > 0) {
-        n_recvd = _recv_file(file_buf, sockfd); 
+        n_recvd = _recv_file(file_buf, sockfd);
         n_write = _write_file(file_buf, file, n_recvd);
         n_remaining -= n_write;
     }
@@ -168,12 +184,12 @@ void free_cmd(struct command *cmd) {
 }
 
 char * get_input(char *buf) {
-    memset(buf, '\0', CMD_LIMIT); 
+    memset(buf, '\0', CMD_LIMIT);
 
     // get input
     if (NULL == fgets(buf, CMD_LIMIT, stdin)) {
         fprintf(stderr, "fgets failed.\n");
-        return NULL;   
+        return NULL;
     }
     // remove newline
     int newline_pos = strcspn(buf, "\n");
@@ -245,6 +261,6 @@ void *get_in_addr(struct sockaddr *sa)
     if (sa->sa_family == AF_INET) { // IPv4
         return &(((struct sockaddr_in*)sa)->sin_addr);
     }
-    
+
     return &(((struct sockaddr_in6*)sa)->sin6_addr); // IPv6
 }
