@@ -66,6 +66,7 @@ int _put(int sockfd, struct command *cmd) {
     }
 
     cmd->err = FILE_OK;
+    print_cmd(cmd);
     send_cmd(sockfd, cmd);
 
     if (0 != (n_remaining = recv_write_file(sockfd, file, cmd->fsz))) {
