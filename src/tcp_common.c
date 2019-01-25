@@ -15,7 +15,7 @@
 
 #include <arpa/inet.h>
 
-#include "common.h"
+#include "tcp_common.h"
 
 #define TOKENS 3
 

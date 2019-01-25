@@ -14,7 +14,7 @@
 #include <netinet/in.h>
 #include <sys/socket.h>
 
-#include "common.h"
+#include "tcp_common.h"
 
 #define PORT_SIZE 16
 #define HOSTNAME_SIZE 64

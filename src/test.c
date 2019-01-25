@@ -14,7 +14,7 @@
 #include <netinet/in.h>
 #include <sys/socket.h>
 
-#include "common.h"
+#include "tcp_common.h"
 
 #define USAGE "[get|put|quit] filenamesource filenamedest"
 

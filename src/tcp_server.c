@@ -13,8 +13,8 @@
 #include <string.h>
 #include <unistd.h>
 
-#include "server.h"
-#include "common.h"
+#include "tcp_server.h"
+#include "tcp_common.h"
 
 #define PORT "3200"
 #define BACKLOG 10
