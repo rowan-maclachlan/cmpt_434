@@ -18,8 +18,6 @@
 #include "common.h"
 
 #define TOKENS 3
-#define MAX_FILENAME_LEN 64
-#define FILESIZE_MAX 1024
 
 enum cmd_type _get_type(char *cmd) {
     if (0 == strncmp("put", cmd, 3)) {
@@ -51,49 +49,39 @@ char *_from_type(enum cmd_type cmd_type) {
     }
 }
 
-int _deserialize_cmd(char *cmd_buf, struct command **cmd) {
+struct command * _deserialize_cmd(char *cmd_buf) {
     char type[MAX_FILENAME_LEN] = { '\0' };
     char src[MAX_FILENAME_LEN] = { '\0' };
     char dest[MAX_FILENAME_LEN] = { '\0' };
     size_t size = 0;
     enum error err = 0;
+    struct command *cmd = NULL;
 
+    cmd = malloc(sizeof *cmd);
     if (NULL == cmd) {
-        fprintf(stderr, "NULL **cmd.\n");
-        return -1;
+        perror("malloc");
+        return NULL;
     }
-    *cmd = malloc(sizeof cmd);
-    if (NULL == *cmd) {
-        fprintf(stderr, "malloc failed.\n");
-        return -1;
-    }
-    if (5 != sscanf(cmd_buf, "%s %s %s %zu %u", type, src, dest, &size, &err)) {
+    if (5 != sscanf(cmd_buf, " %s %s %s %zu %u ", type, src, dest, &size, &err)) {
         fprintf(stderr, "sscanf failed to scan input.\n");
-        free(*cmd);
-        *cmd = NULL;
-        return -1;
+        free(cmd);
+        return NULL;
     }
 
-    (*cmd)->type = _get_type(type);
-    (*cmd)->src = strndup(src, strlen(src) + 1);
-    (*cmd)->dest = strndup(dest, strlen(dest) + 1);
-    (*cmd)->fsz = size;
-    (*cmd)->err = err;
+    printf("%s, %s, %s, %zu, %u\n", type, src, dest, size, err);
+    cmd->type = _get_type(type);
+    cmd->src = strdup(src);
+    cmd->dest = strdup(dest);
+    cmd->fsz = size;
+    cmd->err = err;
 
-    if (NULL == *cmd ||
-           0 == strcmp((*cmd)->src, "") ||
-           0 == strcmp((*cmd)->dest, "")) {
-        fprintf(stderr, "Error: Process %d failed to deserialize the command.\n", getpid());
-        return -1;
-    }
-
-    return 0;
+    return cmd;
 }
 
 int _recv_file(char *buf, int sockfd) {
     size_t num_bytes = 0;
 
-    if ((num_bytes = recv(sockfd, buf, MAX_DATA_SIZE-1, 0)) == -1) {
+    if ((num_bytes = recv(sockfd, buf, FILESIZE_MAX-1, 0)) == -1) {
         perror("recv");
         return -1;
     }
@@ -126,7 +114,7 @@ int recv_cmd(int sockfd, struct command **cmd) {
 
     printf("Process %d received serialized command '%s'\n", getpid(), cmd_buf);
 
-    if (-1 == _deserialize_cmd(cmd_buf, cmd)) {
+    if (NULL == (*cmd = _deserialize_cmd(cmd_buf))) {
         fprintf(stderr, "Error: Process %d failed to deserialize the command.\n", getpid());
         return -1;
     }
@@ -137,7 +125,6 @@ int recv_cmd(int sockfd, struct command **cmd) {
         fprintf(stderr, "Error: Process %d failed to deserialize the command.\n", getpid());
         return -1;
     }
-
 
     return 0;
 }
@@ -152,7 +139,7 @@ void send_cmd(int sockfd, struct command *cmd) {
 size_t send_file(FILE *file, int sockfd, size_t n_bytes) {
     size_t n_read = 0;
     size_t n_send = 0;
-    char file_buf[MAX_DATA_SIZE];
+    char file_buf[FILESIZE_MAX];
 
     while ((n_read = fread(file_buf, 1, sizeof file_buf, file)) > 0) {
         if(n_read != (n_send = send(sockfd, file_buf, n_read, 0))) {
@@ -167,7 +154,7 @@ size_t send_file(FILE *file, int sockfd, size_t n_bytes) {
 size_t recv_write_file(int sockfd, FILE *file, size_t n_remaining) {
     size_t n_recvd = 0;
     size_t n_write = 0;
-    char file_buf[MAX_DATA_SIZE];
+    char file_buf[FILESIZE_MAX];
     while(n_remaining > 0) {
         n_recvd = _recv_file(file_buf, sockfd);
         n_write = _write_file(file_buf, file, n_recvd);
@@ -209,13 +196,13 @@ struct command * parse_cmd(char *buf) {
         return NULL;
     }
 
-    cmd = malloc(sizeof cmd);
+    cmd = malloc(sizeof *cmd);
     if (NULL == cmd) {
         fprintf(stderr, "malloc failed, exiting.\n");
         return NULL;
     }
 
-    if (3 != sscanf(buf, "%s %s %s", type, src, dest)) {
+    if (3 != sscanf(buf, " %s %s %s ", type, src, dest)) {
         fprintf(stderr, "sscanf failed to scan input.\n");
         return NULL;
     }

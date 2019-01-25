@@ -7,9 +7,10 @@
 
 #include <sys/types.h>
 
-#define MAX_DATA_SIZE 1024 // max number of bytes we can get at once
 #define CMD_LIMIT 256
 #define TIMEOUT 10
+#define MAX_FILENAME_LEN 64
+#define FILESIZE_MAX 1024
 
 enum cmd_type {
     QUIT = 0,

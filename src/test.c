@@ -18,29 +18,78 @@
 
 #define USAGE "[get|put|quit] filenamesource filenamedest"
 
+enum cmd_type get_type(char *cmd) {
+    if (0 == strncmp("put", cmd, 3)) {
+        return PUT;
+    }
+    else if (0 == strncmp("get", cmd, 3)) {
+        return GET;
+    }
+    else if (0 == strncmp("quit", cmd, 3)) {
+        return QUIT;
+    }
+    else {
+        return INV;
+    }
+}
+
+int _recv_cmd(char *cmd_buf) {
+    char type[MAX_FILENAME_LEN] = { '\0' };
+    char src[MAX_FILENAME_LEN] = { '\0' };
+    char dest[MAX_FILENAME_LEN] = { '\0' };
+    size_t size = 0;
+    enum error err = 0;
+    struct command *cmd = NULL;
+
+    printf("Process %d received serialized command '%s'\n", getpid(), cmd_buf);
+
+    cmd = malloc(sizeof (struct command));
+    if (NULL == cmd) {
+        perror("malloc");
+        return -1;
+    }
+    if (5 != sscanf(cmd_buf, " %s %s %s %zu %u ", type, src, dest, &size, &err)) {
+        fprintf(stderr, "sscanf failed to scan input.\n");
+        free(cmd);
+        return -1;
+    }
+
+    printf("%s, %s, %s, %zu, %u\n", type, src, dest, size, err);
+
+    cmd->type = get_type(type);
+    cmd->src = strdup(src);
+    cmd->dest = strdup(dest);
+    cmd->fsz = size;
+    cmd->err = err;
+
+    print_cmd(cmd);
+
+    free(cmd);
+
+    return 0;
+}
+
+char * _get_input(char *buf) {
+    // get input
+    if (NULL == fgets(buf, CMD_LIMIT, stdin)) {
+        fprintf(stderr, "fgets failed.\n");
+        return NULL;
+    }
+    // remove newline
+    int newline_pos = strcspn(buf, "\n");
+    buf[newline_pos] = '\0';
+
+    return buf;
+}
 
 int main(int argc, char **argv) {
-    char buf[MAX_DATA_SIZE];
-    struct command *cmd;
-    char type[8];
-    char src[64];
-    char dest[64];
-    char ser[CMD_LIMIT];
+    char cmd_buf[CMD_LIMIT] = { '\0' };
    
     while(1) {
-        memset(type, 0, 8);
-        memset(src, 0, 64);
-        memset(dest, 0, 64);
-        memset(buf, 0, MAX_DATA_SIZE);
 
         printf("Enter command of the form '%s':\n", USAGE);
 
-        cmd = parse_cmd(get_input(buf));
-        print_cmd(cmd);
-
-        printf("\nClient sending command '%s' with length %lu\n", ser, strlen(ser));
-
-        free(cmd);
+        _recv_cmd(_get_input(cmd_buf));
     }
     
     exit(EXIT_SUCCESS);

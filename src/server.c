@@ -16,7 +16,7 @@
 #include "server.h"
 #include "common.h"
 
-#define PORT "32000"
+#define PORT "3200"
 #define BACKLOG 10
 #define HOSTNAME_LEN 256
 
@@ -97,7 +97,7 @@ int _get(int sockfd, struct command *cmd) {
     fseek(file, 0L, SEEK_END);
     cmd->fsz = ftell(file);
     fseek(file, 0L, SEEK_SET);
-    if (cmd->fsz > MAX_DATA_SIZE) {
+    if (cmd->fsz > FILESIZE_MAX) {
         fprintf(stderr, "Filesize exceeds limits.\n");
         cmd->err = FILE_OVERSIZE;
         send_cmd(sockfd, cmd);

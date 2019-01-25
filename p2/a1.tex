@@ -134,14 +134,19 @@ Part B
             greatest constraint on the maximum data rate.\\
     \end{enumerate}
     \item (4 marks) Consider a scenario in which 100 sessions share a link of data
-    rate 100 Mbps (i.e., 100 x 106 bps). Suppose that each session alternates
+    rate 100 Mbps (i.e., 100 x $10^6$ bps). Suppose that each session alternates
     between idle periods (when no data is being sent) of average duration 1
     second, and busy periods of average duration B.
     \begin{enumerate}
         \item Supposing that circuit switching is used (i.e., channel capacity
             is evenly divided among the sessions, with a session’s allocated
             capacity unused when the session is idle), give the achievable data
-            transmission rate a session can achieve during its busy period.
+            transmission rate a session can achieve during its busy period.\\
+            If there are a hundred sessions on the 100 Mbps link, then each
+            sessions 1/100 of that capacity.  Therefore, a specific session has
+            1 Mbps data rate.  During its busy period, a session could
+            theoretically use the entire 1 Mpbs to acheive a 1 Mpbs data
+            transmission rate.
         \item Give an estimate of the average achievable data rate of each
             session (during its busy period) when packet switching is used, for
             B = 10 seconds, B = 1 second, B = 100 milliseconds, and B = 10
@@ -153,9 +158,25 @@ Part B
                 sessions can be approximated by the total number of other sessions (99)
                 times the fraction of time that each is in its busy period.
         \end{itemize}
-            $99 * ( B / I + B )$ <- average busy period 
-            $1Gbps / 1 + (99 * ( B / I + B )$ <- average achievable data rate
-            for busy session.
+        \begin{enumerate}
+            \item $B = 10s$\\
+                When $B = 10s$, then the average bandwidth for a session
+                ($BW_{avg}$) in its busy period will be around $100 Mbps / 1 +
+                (99 * ( B / I + B )$ where $I$ is the idle period of 1 second.
+                Then, \[ BW_{avg} = 100 Mbps / 1 + ( 99 * ( 10s / 11s)) \]
+                      \[ BW_{avg} = 100 Mbps / 91 \approx 1.1 Mbps \]
+            \item $B = 1s$\\
+                \[ BW_{avg} = 100 Mbps / 1 + ( 99 * ( 1s / 2s)) \]
+                \[ BW_{avg} = 100 Mbps / 50.5 \approx 2 Mbps \]
+            \item $B = 100ms$\\
+                \[ BW_{avg} = 100 Mbps / 1 + ( 99 * ( \num{1e-1}s / \num{1.1e0}s)) \]
+                \[ BW_{avg} = 100 Mbps / 1 + ( 99 * \num{1e1}s\]
+                \[ BW_{avg} = 100 Mbps / 10 \approx 10 Mbps \]
+            \item $B = 10ms$\\
+                \[ BW_{avg} = 100 Mbps / 1 + ( 99 * ( \num{1e-2}s / \num{1.01e-0}s)) \]
+                \[ BW_{avg} = 100 Mbps / 1 + ( .98) \]
+                \[ BW_{avg} = 100 Mbps / 1.98 \approx 102 Mbps \]
+        \end{enumerate}
     \end{enumerate}
     \item (8 marks) Consider a source and destination pair connected by a network
         path of capacity 100 Mbps and a round-trip time of 100 ms (measured from

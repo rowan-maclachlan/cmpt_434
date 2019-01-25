@@ -33,7 +33,7 @@ int _put(int sockfd, struct command *cmd) {
     fseek(file, 0L, SEEK_END);
     cmd->fsz = ftell(file);
     fseek(file, 0L, SEEK_SET);
-    if (cmd->fsz > MAX_DATA_SIZE) {
+    if (cmd->fsz > FILESIZE_MAX) {
         fprintf(stderr, "Filesize exceeds limits.\n");
         return -1;
     }
