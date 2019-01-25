@@ -66,11 +66,10 @@ int _put(int sockfd, struct command *cmd) {
     }
 
     cmd->err = FILE_OK;
-    print_cmd(cmd);
     send_cmd(sockfd, cmd);
 
     if (0 != (n_remaining = recv_write_file(sockfd, file, cmd->fsz))) {
-        fprintf(stderr, "Error: server: failed to receive/write file.\n");
+        fprintf(stderr, "Error: server: failed to receive/write full file file.\n");
     }
 
     fclose(file);
@@ -105,7 +104,7 @@ int _get(int sockfd, struct command *cmd) {
         return -1;
     }
     else if (cmd->fsz <= 0) {
-        fprintf(stderr, "Filesize is 0.\n");
+        fprintf(stderr, "File is empty.\n");
         cmd->err = FILE_EMPTY;
         send_cmd(sockfd, cmd);
         fclose(file);

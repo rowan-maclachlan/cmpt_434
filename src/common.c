@@ -68,7 +68,6 @@ struct command * _deserialize_cmd(char *cmd_buf) {
         return NULL;
     }
 
-    printf("%s, %s, %s, %zu, %u\n", type, src, dest, size, err);
     cmd->type = _get_type(type);
     cmd->src = strdup(src);
     cmd->dest = strdup(dest);
@@ -81,7 +80,7 @@ struct command * _deserialize_cmd(char *cmd_buf) {
 int _recv_file(char *buf, int sockfd) {
     size_t num_bytes = 0;
 
-    if ((num_bytes = recv(sockfd, buf, FILESIZE_MAX-1, 0)) == -1) {
+    if ((num_bytes = recv(sockfd, buf, FILE_BUFF_MAX-1, 0)) == -1) {
         perror("recv");
         return -1;
     }
@@ -119,13 +118,6 @@ int recv_cmd(int sockfd, struct command **cmd) {
         return -1;
     }
 
-    if (*cmd == NULL ||
-            0 == strcmp((*cmd)->src, "") ||
-            0 == strcmp((*cmd)->dest, "")) {
-        fprintf(stderr, "Error: Process %d failed to deserialize the command.\n", getpid());
-        return -1;
-    }
-
     return 0;
 }
 
@@ -139,22 +131,27 @@ void send_cmd(int sockfd, struct command *cmd) {
 size_t send_file(FILE *file, int sockfd, size_t n_bytes) {
     size_t n_read = 0;
     size_t n_send = 0;
-    char file_buf[FILESIZE_MAX];
+    char file_buf[FILE_BUFF_MAX];
 
-    while ((n_read = fread(file_buf, 1, sizeof file_buf, file)) > 0) {
+    while ((n_read = fread(file_buf, 1, FILE_BUFF_MAX, file)) > 0) {
+        // Here n_read is the number of bytes of the file we have read.
+        // We know already that n_bytes is a valid total file size
+        // NOw, we have to send these bytes.  What do we do if send cannot send
+        // 'n_read' bytes at a time?
         if(n_read != (n_send = send(sockfd, file_buf, n_read, 0))) {
             perror("send");
         }
         n_bytes -= n_send;
     }
 
+    // If we never had any problems, n_bytes should be 0 here.
     return n_bytes;
 }
 
 size_t recv_write_file(int sockfd, FILE *file, size_t n_remaining) {
     size_t n_recvd = 0;
     size_t n_write = 0;
-    char file_buf[FILESIZE_MAX];
+    char file_buf[FILE_BUFF_MAX];
     while(n_remaining > 0) {
         n_recvd = _recv_file(file_buf, sockfd);
         n_write = _write_file(file_buf, file, n_recvd);

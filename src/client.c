@@ -34,7 +34,7 @@ int _put(int sockfd, struct command *cmd) {
     cmd->fsz = ftell(file);
     fseek(file, 0L, SEEK_SET);
     if (cmd->fsz > FILESIZE_MAX) {
-        fprintf(stderr, "Filesize exceeds limits.\n");
+        fprintf(stderr, "Filesize of %zu bytes exceeds limits.\n", cmd->fsz);
         return -1;
     }
 
@@ -175,14 +175,17 @@ int main(int argc, char **argv) {
             continue;
         }
         else if (cmd->type == PUT) {
-            _put(sockfd, cmd);
+            if (0 != _put(sockfd, cmd)) {
+                fprintf(stderr, "Error: client: failed to execute put command.\n");
+            }
         }
         else if (cmd->type == GET) {
-            _get(sockfd, cmd);
+            if (0 != _get(sockfd, cmd)) {
+                fprintf(stderr, "Error: client: failed to execute put command.\n");
+            }
         }
         else {
-           free(cmd);
-           break;
+            fprintf(stderr, "Invalid command option.  Try again.\n");
         }
 
         free(cmd);

@@ -10,7 +10,8 @@
 #define CMD_LIMIT 256
 #define TIMEOUT 10
 #define MAX_FILENAME_LEN 64
-#define FILESIZE_MAX 1024
+#define FILE_BUFF_MAX 1024
+#define FILESIZE_MAX 1024*FILE_BUFF_MAX
 
 enum cmd_type {
     QUIT = 0,
