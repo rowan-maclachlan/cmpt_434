@@ -49,38 +49,23 @@ char *_from_type(enum cmd_type cmd_type) {
     }
 }
 
-struct command * _deserialize_cmd(char *cmd_buf) {
-    char type[MAX_FILENAME_LEN] = { '\0' };
-    char src[MAX_FILENAME_LEN] = { '\0' };
-    char dest[MAX_FILENAME_LEN] = { '\0' };
-    size_t size = 0;
-    enum error err = 0;
-    struct command *cmd = NULL;
+int _deserialize_cmd(char *cmd_buf, struct command *cmd) {
 
-    cmd = malloc(sizeof *cmd);
-    if (NULL == cmd) {
-        perror("malloc");
-        return NULL;
-    }
-    if (5 != sscanf(cmd_buf, " %s %s %s %zu %u ", type, src, dest, &size, &err)) {
+    memset(cmd->src, 0, MAX_FILENAME_LEN+1);
+    memset(cmd->dest, 0, MAX_FILENAME_LEN+1);
+    if (5 != sscanf(cmd_buf, "%u %s %s %zu %u", 
+                &(cmd->type), cmd->src, cmd->dest, &(cmd->fsz), &(cmd->err))) {
         fprintf(stderr, "sscanf failed to scan input.\n");
-        free(cmd);
-        return NULL;
+        return -1;
     }
 
-    cmd->type = _get_type(type);
-    cmd->src = strdup(src);
-    cmd->dest = strdup(dest);
-    cmd->fsz = size;
-    cmd->err = err;
-
-    return cmd;
+    return 0;
 }
 
 int _recv_file(char *buf, int sockfd) {
     size_t num_bytes = 0;
 
-    if ((num_bytes = recv(sockfd, buf, FILE_BUFF_MAX-1, 0)) == -1) {
+    if ((num_bytes = recv(sockfd, buf, FILE_BUFF_MAX, 0)) == -1) {
         perror("recv");
         return -1;
     }
@@ -99,21 +84,21 @@ int _write_file(char *buf, FILE *file_to_write, size_t n_write) {
 }
 
 int _serialize_cmd(char *buf, struct command *cmd) {
-    return sprintf(buf, "%s %s %s %zu %u%c",
-            _from_type(cmd->type), cmd->src, cmd->dest, cmd->fsz, cmd->err, '\0');
+    return sprintf(buf, "%u %s %s %zu %u",
+            cmd->type, cmd->src, cmd->dest, cmd->fsz, cmd->err);
 }
 
-int recv_cmd(int sockfd, struct command **cmd) {
-    char cmd_buf[CMD_LIMIT] = { '\0' };
+int recv_cmd(int sockfd, struct command *cmd) {
+    char cmd_buf[CMD_SIZE] = { '\0' };
 
-    if (-1 == (recv(sockfd, cmd_buf, CMD_LIMIT, 0))) {
+    if (-1 == (recv(sockfd, cmd_buf, CMD_SIZE, 0))) {
         perror("recv");
         return -1;
     }
 
     printf("[%d] received serialized command '%s' on socket %d\n", getpid(), cmd_buf, sockfd);
 
-    if (NULL == (*cmd = _deserialize_cmd(cmd_buf))) {
+    if (-1 == (_deserialize_cmd(cmd_buf, cmd))) {
         fprintf(stderr, "Error: Process %d failed to deserialize the command.\n", getpid());
         return -1;
     }
@@ -122,10 +107,10 @@ int recv_cmd(int sockfd, struct command **cmd) {
 }
 
 void send_cmd(int sockfd, struct command *cmd) {
-    char cmd_buf[CMD_LIMIT] = { '\0' };
+    char cmd_buf[CMD_SIZE] = { '\0' };
     _serialize_cmd(cmd_buf, cmd);
     printf("[%d] sent serialized command '%s' on socket %d\n", getpid(), cmd_buf, sockfd);
-    send(sockfd, cmd_buf, strlen(cmd_buf), 0);
+    send(sockfd, cmd_buf, CMD_SIZE, 0);
 }
 
 size_t send_file(FILE *file, int sockfd, size_t n_bytes) {
@@ -211,17 +196,11 @@ size_t proxy_recv_write_file(int sockfd, FILE *file, size_t n_remaining) {
     return n_remaining;
 }
 
-void free_cmd(struct command *cmd) {
-    free(cmd->src);
-    free(cmd->dest);
-    free(cmd);
-}
-
 char * get_input(char *buf) {
-    memset(buf, '\0', CMD_LIMIT);
+    memset(buf, '\0', CMD_SIZE);
 
     // get input
-    if (NULL == fgets(buf, CMD_LIMIT, stdin)) {
+    if (NULL == fgets(buf, CMD_SIZE, stdin)) {
         fprintf(stderr, "fgets failed.\n");
         return NULL;
     }
@@ -232,53 +211,44 @@ char * get_input(char *buf) {
     return buf;
 }
 
-struct command * parse_cmd(char *buf) {
-    struct command *cmd = NULL;
+int parse_cmd(char *buf, struct command *cmd) {
     char type[MAX_FILENAME_LEN] = { '\0' };
-    char src[MAX_FILENAME_LEN] = { '\0' };
-    char dest[MAX_FILENAME_LEN] = {'\0' };
     int toks = 0;
 
     if (NULL == buf) {
         fprintf(stderr, "Provided buffer is NULL, exiting...\n");
-        return NULL;
+        return -1;
     }
 
-    cmd = malloc(sizeof *cmd);
     if (NULL == cmd) {
-        fprintf(stderr, "malloc failed, exiting.\n");
-        return NULL;
+        fprintf(stderr, "Provided command is NULL, exiting...\n");
+        return -1;
     }
 
-    toks = sscanf(buf, " %s %s %s ", type, src, dest);
+    toks = sscanf(buf, " %s %s %s ", type, cmd->src, cmd->dest);
     if (1 == toks) { // Quit
-        cmd->src = strdup("0");
-        cmd->dest = strdup("0");
+        memset(cmd->src, 0, MAX_FILENAME_LEN);
+        memset(cmd->src, 0, MAX_FILENAME_LEN);
     }
-    else if (3 != toks) { // Invalid
+    else if (3 == toks) { // Well formed
+        cmd->src[MAX_FILENAME_LEN] = '\0';
+        cmd->dest[MAX_FILENAME_LEN] = '\0';
+    }
+    else { // Invalid 
         fprintf(stderr, "sscanf failed to scan input.\n");
-        return NULL;
+        return -1;
     }
-    else { // Fully formed
-        cmd->src = strdup(src);
-        cmd->dest = strdup(dest);
-    }
+
     cmd->type = _get_type(type);
     cmd->fsz = 0;
     cmd->err = FILE_OK;
 
-    return cmd;
+    return 0;
 }
 
 void print_cmd(struct command *cmd) {
     if (NULL == cmd) {
         printf("NULL command.");
-    }
-    else if (cmd->src == NULL) {
-        printf("command src is NULL");
-    }
-    else if (cmd->dest == NULL) {
-        printf("command dest is NULL");
     }
     else {
         printf("type: %d, source: %s, dest: %s, size: %zu, err: %u\n",

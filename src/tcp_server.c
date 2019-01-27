@@ -97,7 +97,7 @@ int _get(int sockfd, struct command *cmd) {
     fclose(file);
 
     // Recieve confirmation that the file was fully written successfully.
-    if (-1 == recv_cmd(sockfd, &cmd)) {
+    if (-1 == recv_cmd(sockfd, cmd)) {
         fprintf(stderr, "Error: server: failed to receive the confirmation command.\n"); return -1;
     }
 
@@ -117,7 +117,7 @@ int main(int argc, char **argv) {
     int sock_fd = 0; // listen on this fd
     int new_fd = 0; // listening for the child process
     int status;
-    struct command *cmd = NULL;
+    struct command cmd;
     int yes = 1;
     char hostname[HOSTNAME_LEN];
 
@@ -193,17 +193,17 @@ int main(int argc, char **argv) {
                 continue;
             }
 
-            if (cmd->type == PUT) {
-                if (0 != (status = _put(new_fd, cmd))) {
+            if (cmd.type == PUT) {
+                if (0 != (status = _put(new_fd, &cmd))) {
                     fprintf(stderr, "Error: server: failed to execute put command: %d\n", status);
                 }
             }
-            else if (cmd->type == GET) {
-                if (0 != (status = _get(new_fd, cmd))) {
+            else if (cmd.type == GET) {
+                if (0 != (status = _get(new_fd, &cmd))) {
                     fprintf(stderr, "Error: server: failed to execute get command: %d\n", status);
                 }
             }
-            else if (cmd->type == QUIT) {
+            else if (cmd.type == QUIT) {
                 printf("server: closing connections with socket %d.\n", new_fd);
                 close(new_fd);
                 break;
@@ -211,8 +211,6 @@ int main(int argc, char **argv) {
             else {
                fprintf(stderr, "Invalid command format.\n");
             }
-
-            free(cmd);
         }
     }
 

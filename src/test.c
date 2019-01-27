@@ -56,12 +56,6 @@ int _recv_cmd(char *cmd_buf) {
 
     printf("%s, %s, %s, %zu, %u\n", type, src, dest, size, err);
 
-    cmd->type = get_type(type);
-    cmd->src = strdup(src);
-    cmd->dest = strdup(dest);
-    cmd->fsz = size;
-    cmd->err = err;
-
     print_cmd(cmd);
 
     free(cmd);
@@ -71,7 +65,7 @@ int _recv_cmd(char *cmd_buf) {
 
 char * _get_input(char *buf) {
     // get input
-    if (NULL == fgets(buf, CMD_LIMIT, stdin)) {
+    if (NULL == fgets(buf, CMD_SIZE, stdin)) {
         fprintf(stderr, "fgets failed.\n");
         return NULL;
     }
@@ -83,7 +77,7 @@ char * _get_input(char *buf) {
 }
 
 int main(int argc, char **argv) {
-    char cmd_buf[CMD_LIMIT] = { '\0' };
+    char cmd_buf[CMD_SIZE] = { '\0' };
    
     while(1) {
 

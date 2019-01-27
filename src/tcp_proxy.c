@@ -50,7 +50,7 @@ int _server_put(int sockfd, struct command *cmd) {
     cmd->err = FILE_OK;
     send_cmd(sockfd, cmd);
 
-    if (0 != (n_remaining = recv_write_file(sockfd, file, cmd->fsz))) {
+    if (0 != (n_remaining = proxy_recv_write_file(sockfd, file, cmd->fsz))) {
         fprintf(stderr, "Error: proxy: failed to receive/write full file file.\n");
     }
 
@@ -99,14 +99,14 @@ int _server_get(int sockfd, struct command *cmd) {
 
     cmd->err = FILE_OK;
     send_cmd(sockfd, cmd);
+    sleep(1);
     n_remaining = send_file(file, sockfd, cmd->fsz);
 
     fclose(file);
 
     // Recieve confirmation from client.
-    if (-1 == recv_cmd(sockfd, &cmd)) {
+    if (-1 == recv_cmd(sockfd, cmd)) {
         fprintf(stderr, "Error: proxy: failed to receive confirmation command.\n");
-        cmd->err = CMD_FAILED;
         return -1;
     }
     
@@ -136,7 +136,7 @@ int _client_put(int sockfd, struct command *cmd) {
     // Send put request
     send_cmd(sockfd, cmd);
     // Recieve handshake
-    if (-1 == recv_cmd(sockfd, &cmd)) {
+    if (-1 == recv_cmd(sockfd, cmd)) {
         fprintf(stderr, "Error: proxy: failed to receive handshake command.\n");
         cmd->err = CMD_FAILED;
         return -1;
@@ -165,7 +165,7 @@ int _client_get(int sockfd, struct command *cmd) {
     send_cmd(sockfd, cmd);
 
     // Recieve handshake
-    if (-1 == recv_cmd(sockfd, &cmd)) {
+    if (-1 == recv_cmd(sockfd, cmd)) {
         fprintf(stderr, "Error: proxy: failed to receive handshake command.\n");
         fclose(file);
         return -1;
@@ -178,7 +178,7 @@ int _client_get(int sockfd, struct command *cmd) {
     }
 
     // Receive file contents
-    if (0 != (n_remaining = recv_write_file(sockfd, file, cmd->fsz))) {
+    if (0 != (n_remaining = proxy_recv_write_file(sockfd, file, cmd->fsz))) {
         fprintf(stderr, "Error: proxy: failed to receive/write file.\n");
     }
 
@@ -320,30 +320,29 @@ int _server_connect() {
 }
 
 int _put(int client_sock, int server_sock, struct command *cmd) {
-    char tmp_filename[MAX_FILENAME_LEN] = { 0 };
+    char tmp_filename[MAX_FILENAME_LEN+1] = { 0 };
     int status = 0;
     // We can't give it the same filename, because the proxy may not
     // have the same directory structure of permissions as the actual
     // server.  We must give it a shorter, default name.  Not
     // "cmd->dest"
     strncpy(tmp_filename, cmd->dest, MAX_FILENAME_LEN);
-    free(cmd->dest);
-    cmd->dest = strdup(TMP_NAME);
+    strncpy(cmd->dest, TMP_NAME, MAX_FILENAME_LEN);
     if (0 != (status = _server_put(client_sock, cmd))) {
         fprintf(stderr, "Error: proxy: failed to execute put command with client: %d\n", status);
     }
     // restore the original 'cmd->dest' filename
-    free(cmd->dest);
-    cmd->dest = strdup(tmp_filename);
+    strncpy(cmd->dest, tmp_filename, MAX_FILENAME_LEN);
     // Forward the put command to the server now, copying our temporary
     // file and sending it.
-    free(cmd->src);
-    cmd->src = strdup(TMP_NAME);
+    strncpy(tmp_filename, cmd->src, MAX_FILENAME_LEN);
+    strncpy(cmd->src, TMP_NAME, MAX_FILENAME_LEN);
     if (0 != (status = _client_put(server_sock, cmd))) {
         fprintf(stderr, "Error: proxy: failed to execute put command with server: %d\n", status);
     }
 
     // forward confirmation message to the waiting client.
+    strncpy(cmd->src, tmp_filename, MAX_FILENAME_LEN);
     send_cmd(client_sock, cmd);
 
     return 0;
@@ -359,26 +358,25 @@ int _get(int client_sock, int server_sock, struct command *cmd) {
     // back when we forward the actual file back to the client.  We will
     // need to change the source at that point, too.
     strncpy(tmp_filename, cmd->dest, MAX_FILENAME_LEN);
-    free(cmd->dest);
-    cmd->dest = strdup(TMP_NAME);
+    strncpy(cmd->dest, TMP_NAME, MAX_FILENAME_LEN);
     // Forward the get command to the server
     if (0 != (status = _client_get(server_sock, cmd))) {
         fprintf(stderr, "Error: proxy: failed to execute get command with server: %d\n", status);
     }
     // restore the original 'cmd->dest' filename
-    free(cmd->dest);
-    cmd->dest = strdup(tmp_filename);
+    strncpy(cmd->dest, tmp_filename, MAX_FILENAME_LEN);
     // Respond with to the client with the file content we previously
     // acquired.  First with the handshake, then the file contents. 
     // Finally, recieve confirmation of file write, and forward to
     // server.
-    free(cmd->src);
-    cmd->src = strdup(TMP_NAME);
-    if (0 != (status = _server_get(client_sock, cmd))) {
+    strncpy(tmp_filename, cmd->src, MAX_FILENAME_LEN);
+    strncpy(cmd->src, TMP_NAME, MAX_FILENAME_LEN);
+    if (0 != _server_get(client_sock, cmd)) {
         fprintf(stderr, "Error: proxy: failed to execute get command with client: %d\n", status);
     }
 
     // forward the confirmation from the client to the server.
+    strncpy(cmd->src, tmp_filename, MAX_FILENAME_LEN);
     send_cmd(server_sock, cmd);
 
     return 0;
@@ -389,7 +387,7 @@ int main(int argc, char **argv) {
     char hostname[HOSTNAME_SIZE] = { 0 };
     int client_sock = 0;
     int server_sock = 0;
-    struct command *cmd = NULL;
+    struct command cmd;
 
     if (argc != 3) {
         printf("Usage: %s <host name> <port number>", argv[0]);
@@ -423,20 +421,19 @@ int main(int argc, char **argv) {
                 continue;
             }
 
-            if (cmd->type == PUT) {
-                _put(client_sock, server_sock, cmd);
+            if (cmd.type == PUT) {
+                _put(client_sock, server_sock, &cmd);
             }
-            else if (cmd->type == GET) {
-                _get(client_sock, server_sock, cmd);
+            else if (cmd.type == GET) {
+                _get(client_sock, server_sock, &cmd);
             }
-            else if (cmd->type == QUIT) {
+            else if (cmd.type == QUIT) {
                 printf("Proxy: closing connections with socket %d.\n", client_sock);
                 break;
             }
             else {
                 fprintf(stderr, "Invalid command option.  Try again.\n");
             }
-            free(cmd);
         }
         close(client_sock);
     }

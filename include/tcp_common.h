@@ -7,7 +7,7 @@
 
 #include <sys/types.h>
 
-#define CMD_LIMIT 256
+#define CMD_SIZE (sizeof (struct command) + 4)
 #define TIMEOUT 10
 #define MAX_FILENAME_LEN 64
 #define FILE_BUFF_MAX 1024
@@ -32,8 +32,8 @@ enum error {
 
 struct command { 
     enum cmd_type type;
-    char *src;
-    char *dest;
+    char src[MAX_FILENAME_LEN+1];
+    char dest[MAX_FILENAME_LEN+1];
     size_t fsz;
     enum error err;
 };
@@ -42,7 +42,7 @@ size_t proxy_recv_write_file(int sockfd, FILE *file, size_t n_remaining);
 
 size_t recv_write_file(int sockfd, FILE *file, size_t n_remaining);
 
-int recv_cmd(int sockfd, struct command **cmd);
+int recv_cmd(int sockfd, struct command *cmd);
 
 void send_cmd(int sockfd, struct command *cmd);
 
@@ -56,7 +56,7 @@ char * get_input(char *buf);
 
 void print_cmd(struct command *cmd);
 
-struct command * parse_cmd(char *buf);
+int parse_cmd(char *buf, struct command *cmd);
 
 void set_timeout(int sockfd);
 

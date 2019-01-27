@@ -7,8 +7,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
-#include <errno.h>
-#include <string.h>
+#include <errno.h> #include <string.h>
 #include <netdb.h>
 #include <sys/types.h>
 #include <netinet/in.h>
@@ -43,7 +42,7 @@ int _put(int sockfd, struct command *cmd) {
     // Send put request
     send_cmd(sockfd, cmd);
     // Recieve handshake
-    if (-1 == recv_cmd(sockfd, &cmd)) {
+    if (-1 == recv_cmd(sockfd, cmd)) {
         fprintf(stderr, "Error: client: failed to receive handshake command.\n");
         cmd->err = CMD_FAILED;
         return -1;
@@ -60,7 +59,7 @@ int _put(int sockfd, struct command *cmd) {
     fclose(file);
 
     // Recieve confirmation that the file was fully written successfully.
-    if (-1 == recv_cmd(sockfd, &cmd)) {
+    if (-1 == recv_cmd(sockfd, cmd)) {
         fprintf(stderr, "Error: client: failed to receive the confirmation command.\n");
         cmd->err = CMD_FAILED;
         return -1;
@@ -90,7 +89,7 @@ int _get(int sockfd, struct command *cmd) {
     send_cmd(sockfd, cmd);
 
     // Recieve handshake
-    if (-1 == recv_cmd(sockfd, &cmd)) {
+    if (-1 == recv_cmd(sockfd, cmd)) {
         fprintf(stderr, "Error: client: failed to receive handshake command.\n");
         fclose(file);
         cmd->err = CMD_FAILED;
@@ -127,8 +126,8 @@ int main(int argc, char **argv) {
     int status;
     char port[PORT_SIZE];
     char hostname[HOSTNAME_SIZE];
-    char cmd_buf[CMD_LIMIT];
-    struct command *cmd;
+    char cmd_buf[CMD_SIZE];
+    struct command cmd;
 
     memset(&hints, 0, sizeof hints);
     hints.ai_family = AF_UNSPEC;
@@ -188,32 +187,33 @@ int main(int argc, char **argv) {
     while(1) {
         printf("Enter command of the form '%s':\n", USAGE);
 
-        cmd = parse_cmd(get_input(cmd_buf));
-
-        if (NULL == cmd || cmd->type == INV) {
+        if (-1 == parse_cmd(get_input(cmd_buf), &cmd)) {
             fprintf(stderr, "Poorly formed command.  Try again.\n");
             continue;
         }
-        else if (cmd->type == PUT) {
-            if (0 != (status = _put(sockfd, cmd))) {
+
+        if (cmd.type == INV) {
+            fprintf(stderr, "Poorly formed command.  Try again.\n");
+            continue;
+        }
+        else if (cmd.type == PUT) {
+            if (0 != (status = _put(sockfd, &cmd))) {
                 fprintf(stderr, "Error: client: failed to execute put command: %d\n", status);
             }
         }
-        else if (cmd->type == GET) {
-            if (0 != (status = _get(sockfd, cmd))) {
+        else if (cmd.type == GET) {
+            if (0 != (status = _get(sockfd, &cmd))) {
                 fprintf(stderr, "Error: client: failed to execute get command: %d\n", status);
             }
         }
-        else if (cmd->type == QUIT) {
+        else if (cmd.type == QUIT) {
             printf("Client: closing connections with socket %d.\n", sockfd);
-            send_cmd(sockfd, cmd);
+            send_cmd(sockfd, &cmd);
             break;
         }
         else {
             fprintf(stderr, "Invalid command option.  Try again.\n");
         }
-
-        free(cmd);
     }
 
     close(sockfd);
