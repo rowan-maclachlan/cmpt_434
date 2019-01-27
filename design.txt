@@ -1,0 +1,80 @@
+Rowan Maclachlan
+rdm695 11165820
+Sunday January 27th 2019
+CMPT 434 Eager
+
+SEE LIMITATIONS BELOW 
+
+DESIGN
+
+    This was a challenging assignment partly because I focused too narrowly on
+    the use of sockets in C programming to the detriment a well-thought out
+    design.  Some issues were not considered at all before implementation began.
+    However, things came together (theoretically, though not in practice) well
+    enough.
+
+    The UDP processes were not completed and so will not be discussed.
+
+    First, consider the client and server alone as a simpler model.
+    Once the connection is made, the use can input a command.  The details of
+    this command are then stores in a fixed-size structure.  The size is exactly
+    big enough to accomodate the command type, 64 character source and
+    destination filenames, a file size, and an error code.
+    
+    If there are any immediate problems (such as permission errors) with the
+    command, the client is notified immediately before any IPC occurs.
+
+    Next, the command is serialized into a byte array and sent to the server.
+    The server is waiting to receive to receive a command, and it is easy to
+    deserialize it back into a command object as all possible fields are present
+    and the received bytes are exactly as many as the size of the command.
+
+    The server then considers the arguments of the command and decides whether
+    it is feasible.  Is the requested file present?  Is it empty?  Is it too
+    big?  Am I allowed to read or write in this directory or to and from this
+    file?  If there is an issue with that, the server puts that error code into
+    the command structure and sends it back to the client.  If there is not
+    problem, the server sends the command without an error code.  This is the
+    'handshake' of the transmission, when the client and server agree to carry
+    forward with the file transfer.
+
+    The client received the handshake, and prepares to either recieve the file,
+    or send it.  The exact size of the file was either given in the handshake,
+    or in the initial message to the server.  This way, the client or server will
+    accept only exactly as many bytes as the server indicated in the handshake.
+
+    The server, after sending the handshake, then sends the file contents or
+    prepares to receive them.  After the file transfer is complete, whichever
+    party received the file then sends a final command message indicating if
+    there were any problems.
+
+    This method of transmission allows for robust file-transfer.  Generally, it
+    looks like this: request -> handshake -> file transfer -> confirmation.
+    Because the command structure is a fixed number of bytes and because it is
+    easily serializable and deserializable, the client and server can easily
+    communicate any small errors or big failures and recover from them.
+    Furthermore, there is no concern about mangling the bytes of the file to add
+    beginning and end flags - everything about the file is known in advance by
+    both parties because of the shared command structure, and the strict message
+    ordering.
+
+    Alone, (just client and server) there are no known serious issues.  However,
+    there is a bug for the `get` command when using the proxy server to
+    communicate.  Its cause is not understood and it is strange behaviour.
+
+    The proxy server follows a very similar design.  The proxy acts both as
+    client to the real server and server to the real client, and follows almost
+    identical communication protocols.  The transferred files are written to
+    disk (Just memory for small files, of course) after altering their contents
+    according to the assignment specifications.  Then, when they are forwarded
+    on, the recipient is provided with resultant file size, and will not miss
+    any bytes of the file.
+
+LIMITATIONS
+
+    There is no UDP process.  Design of the UDP client/server would follow
+    similar logic.
+
+    As noted in the README, there is a known bug when issuing the `get` command
+    through the proxy server.  The server and proxy server hang and the client
+    receives a serialized command instead of a file.
