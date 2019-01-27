@@ -20,35 +20,6 @@
 #define BACKLOG 10
 #define HOSTNAME_LEN 256
 
-struct addrinfo * find_server(int *sock_fd, struct addrinfo *servinfo) {
-    int yes = 1;
-    struct addrinfo *p;
-
-    for(p = servinfo; p != NULL; p = p->ai_next) {
-        if ((*sock_fd = socket(p->ai_family, p->ai_socktype, p->ai_protocol)) == -1) {
-            perror("server: socket");
-            continue;
-        }
-        printf("socket num: %d\n", *sock_fd);
-        if (setsockopt(*sock_fd, SOL_SOCKET, SO_REUSEADDR, &yes, sizeof(int)) == -1) {
-            perror("server: setsockopt");
-            exit(1);
-        }
-
-        if (bind(*sock_fd, p->ai_addr, p->ai_addrlen) != -1) {
-            break;
-        }
-        else {
-            close(*sock_fd);
-            perror("server: bind");
-        }
-    }
-
-    free(servinfo);
-
-    return p;
-}
-
 /**
  * Returns  -1 If there is an error with the request
  *          or the number of bytes we failed to receive and write successfully
@@ -65,14 +36,21 @@ int _put(int sockfd, struct command *cmd) {
         return -1;
     }
 
+    // Send handshake
     cmd->err = FILE_OK;
     send_cmd(sockfd, cmd);
 
+    // receive file
     if (0 != (n_remaining = recv_write_file(sockfd, file, cmd->fsz))) {
-        fprintf(stderr, "Error: server: failed to receive/write full file file.\n");
+        fprintf(stderr, "Error: server: failed to receive/write full file.\n");
+        cmd->err = FILE_INCOMPLETE;
+        cmd->fsz = n_remaining;
     }
 
     fclose(file);
+
+    // Send confirmation command.
+    send_cmd(sockfd, cmd);
 
     return n_remaining;
 }
@@ -111,11 +89,17 @@ int _get(int sockfd, struct command *cmd) {
         return -1;
     }
 
+    // Send handshake message
     cmd->err = FILE_OK;
     send_cmd(sockfd, cmd);
+    // send file
     n_remaining = send_file(file, sockfd, cmd->fsz);
-
     fclose(file);
+
+    // Recieve confirmation that the file was fully written successfully.
+    if (-1 == recv_cmd(sockfd, &cmd)) {
+        fprintf(stderr, "Error: server: failed to receive the confirmation command.\n"); return -1;
+    }
 
     return n_remaining;
 }
@@ -198,25 +182,31 @@ int main(int argc, char **argv) {
         void * in_addr = get_in_addr((struct sockaddr *)&their_addr);
         inet_ntop(their_addr.ss_family, in_addr, s, sizeof s);
 
-        printf("server: got connection from %s...\n", s);
+        printf("server: got connection from %s on socket %d\n", s, new_fd);
 
         while(1) {
+            sleep(1);
             printf("server: waiting for commands...\n");
 
             if (-1 == recv_cmd(new_fd, &cmd)) {
                 fprintf(stderr, "Error: server: failed to receive command.\n");
-                break;
+                continue;
             }
 
             if (cmd->type == PUT) {
-                if (0 != _put(new_fd, cmd)) {
-                    fprintf(stderr, "Error: server: failed to execute put command.\n");
+                if (0 != (status = _put(new_fd, cmd))) {
+                    fprintf(stderr, "Error: server: failed to execute put command: %d\n", status);
                 }
             }
             else if (cmd->type == GET) {
-                if (0 != _get(new_fd, cmd)) {
-                    fprintf(stderr, "Error: server: failed to execute put command.\n");
+                if (0 != (status = _get(new_fd, cmd))) {
+                    fprintf(stderr, "Error: server: failed to execute get command: %d\n", status);
                 }
+            }
+            else if (cmd->type == QUIT) {
+                printf("server: closing connections with socket %d.\n", new_fd);
+                close(new_fd);
+                break;
             }
             else {
                fprintf(stderr, "Invalid command format.\n");
@@ -224,8 +214,6 @@ int main(int argc, char **argv) {
 
             free(cmd);
         }
-
-        close(new_fd);
     }
 
     return 0;

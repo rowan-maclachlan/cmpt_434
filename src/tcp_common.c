@@ -106,12 +106,12 @@ int _serialize_cmd(char *buf, struct command *cmd) {
 int recv_cmd(int sockfd, struct command **cmd) {
     char cmd_buf[CMD_LIMIT] = { '\0' };
 
-    if (recv(sockfd, cmd_buf, CMD_LIMIT, 0) == -1) {
+    if (-1 == (recv(sockfd, cmd_buf, CMD_LIMIT, 0))) {
         perror("recv");
         return -1;
     }
 
-    printf("Process %d received serialized command '%s'\n", getpid(), cmd_buf);
+    printf("[%d] received serialized command '%s' on socket %d\n", getpid(), cmd_buf, sockfd);
 
     if (NULL == (*cmd = _deserialize_cmd(cmd_buf))) {
         fprintf(stderr, "Error: Process %d failed to deserialize the command.\n", getpid());
@@ -124,7 +124,7 @@ int recv_cmd(int sockfd, struct command **cmd) {
 void send_cmd(int sockfd, struct command *cmd) {
     char cmd_buf[CMD_LIMIT] = { '\0' };
     _serialize_cmd(cmd_buf, cmd);
-    printf("Process %d sent serialized command '%s'\n", getpid(), cmd_buf);
+    printf("[%d] sent serialized command '%s' on socket %d\n", getpid(), cmd_buf, sockfd);
     send(sockfd, cmd_buf, strlen(cmd_buf), 0);
 }
 
@@ -133,6 +133,7 @@ size_t send_file(FILE *file, int sockfd, size_t n_bytes) {
     size_t n_send = 0;
     char file_buf[FILE_BUFF_MAX];
 
+    printf("[%d] Sending file contents on socket %d.\n", getpid(), sockfd);
     while ((n_read = fread(file_buf, 1, FILE_BUFF_MAX, file)) > 0) {
         // Here n_read is the number of bytes of the file we have read.
         // We know already that n_bytes is a valid total file size
@@ -152,10 +153,59 @@ size_t recv_write_file(int sockfd, FILE *file, size_t n_remaining) {
     size_t n_recvd = 0;
     size_t n_write = 0;
     char file_buf[FILE_BUFF_MAX];
+    printf("[%d] Receiving file contents on socket %d.\n", getpid(), sockfd);
     while(n_remaining > 0) {
         n_recvd = _recv_file(file_buf, sockfd);
         n_write = _write_file(file_buf, file, n_recvd);
         n_remaining -= n_write;
+    }
+
+    return n_remaining;
+}
+
+int _proxy_alter_buf(char *file_buf, int n_recvd) {
+    int buf_i = 0;
+    int file_buf_i = 0;
+    char buf[FILESIZE_MAX] = { 0 };
+    // Copy the original buffer
+    memcpy(buf, file_buf, n_recvd);
+    
+    for (buf_i = 0; buf_i < n_recvd; buf_i++) {
+        char c = buf[buf_i]; // original character
+        if (c == 'c' || c == 'm' || c == 'p' || c == 't') { // double char
+            file_buf[file_buf_i] = c; //     
+            file_buf[file_buf_i+1] = c;
+            file_buf_i++;
+        }
+        else {
+            file_buf[file_buf_i] = c;
+        }
+        file_buf_i++;
+    }
+    return file_buf_i;
+}
+
+// This function needs to return the amount of bytes ACTUALLY written to the
+// file.  This will be the new file length to forward to the server.  Put this
+// value into the n_remaining field - it is the address of the cmd filesize.
+// Nevermind.  This will accomplished when we read the file back in preparation
+// of sending it to the server.
+size_t proxy_recv_write_file(int sockfd, FILE *file, size_t n_remaining) {
+    size_t n_recvd = 0;
+    size_t n_added = 0;
+    size_t n_write = 0;
+    char file_buf[2*FILE_BUFF_MAX] = { 0 };
+    printf("[%d] Receiving file contents on socket %d.\n", getpid(), sockfd);
+    while(n_remaining > 0) {
+        // receive the file contents into the buffer
+        n_recvd = _recv_file(file_buf, sockfd);
+        // alter the buffer
+        n_added = _proxy_alter_buf(file_buf, n_recvd);
+        // write the altered buffer to file
+        n_write = _write_file(file_buf, file, n_added);
+        // we need to reduce n_remaining only by the bytes ACTUALLY recieved
+        // from the client, because we are writing more than that to file.
+        n_remaining -= n_recvd;
     }
 
     return n_remaining;
@@ -187,6 +237,7 @@ struct command * parse_cmd(char *buf) {
     char type[MAX_FILENAME_LEN] = { '\0' };
     char src[MAX_FILENAME_LEN] = { '\0' };
     char dest[MAX_FILENAME_LEN] = {'\0' };
+    int toks = 0;
 
     if (NULL == buf) {
         fprintf(stderr, "Provided buffer is NULL, exiting...\n");
@@ -199,13 +250,20 @@ struct command * parse_cmd(char *buf) {
         return NULL;
     }
 
-    if (3 != sscanf(buf, " %s %s %s ", type, src, dest)) {
+    toks = sscanf(buf, " %s %s %s ", type, src, dest);
+    if (1 == toks) { // Quit
+        cmd->src = strdup("0");
+        cmd->dest = strdup("0");
+    }
+    else if (3 != toks) { // Invalid
         fprintf(stderr, "sscanf failed to scan input.\n");
         return NULL;
     }
+    else { // Fully formed
+        cmd->src = strdup(src);
+        cmd->dest = strdup(dest);
+    }
     cmd->type = _get_type(type);
-    cmd->src = strdup(src);
-    cmd->dest = strdup(dest);
     cmd->fsz = 0;
     cmd->err = FILE_OK;
 

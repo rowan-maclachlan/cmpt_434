@@ -25,7 +25,9 @@ enum error {
     FILE_OVERSIZE = 1,
     FILE_EMPTY = 2,
     FILE_CANT_READ = 3,
-    FILE_CANT_WRITE = 4
+    FILE_CANT_WRITE = 4,
+    FILE_INCOMPLETE = 5,
+    CMD_FAILED = 6
 };
 
 struct command { 
@@ -35,6 +37,8 @@ struct command {
     size_t fsz;
     enum error err;
 };
+
+size_t proxy_recv_write_file(int sockfd, FILE *file, size_t n_remaining);
 
 size_t recv_write_file(int sockfd, FILE *file, size_t n_remaining);
 

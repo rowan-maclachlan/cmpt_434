@@ -15,13 +15,19 @@ ARCH := $(shell uname -m)
 MAC_OS="Darwin"
 LINUX_OS="Linux"
 ########################################
-TARGET = tcp_server tcp_client tcp_proxy beej_s beej_c test
+TARGET = tcp_server tcp_client tcp_proxy beej_s beej_c test 
 ########################################
 # Directories
 OBJ = ./obj/
 INC = ./include/
 SRC = ./src/
+SRV_DIR = ./server_dir/
+CLI_DIR = ./client_dir/
+PRX_DIR = ./proxy_dir/
 $(shell mkdir -p $(OBJ))
+$(shell mkdir -p $(SRV_DIR))
+$(shell mkdir -p $(CLI_DIR))
+$(shell mkdir -p $(PRX_DIR))
 ########################################
 # Compiler and linker options
 CC = gcc
@@ -39,7 +45,7 @@ CLIENT_OBJ = $(OBJ)tcp_client.o
 COMMON_H = $(INC)tcp_common.h
 COMMON_OBJ = $(OBJ)tcp_common.o
 TEST_OBJ = $(OBJ)test_server.o
-PROXY_OBJ = $(OBJ)tcp_proxy.o
+PROX_OBJ = $(OBJ)tcp_proxy.o
 BEEJ_H = 
 BEEJ_S_OBJ = $(OBJ)beej_s.o
 BEEJ_C_OBJ = $(OBJ)beej_c.o
@@ -47,7 +53,7 @@ BEEJ_C_OBJ = $(OBJ)beej_c.o
 ALL_OBJ = $(CLIENT_OBJ) $(SERVER_OBJ) $(COMMON_OBJ) $(TEST_OBJ) \
 		  $(BEEJ_S_OBJ) $(BEEJ_C_OBJ) $(PROX_OBJ)
 ALL_H = $(CLIENT_H) $(SERVER_H) $(COMMON_H)
-EXEC = tcp_server tcp_client tcp_proxy beej_s beej_c
+EXEC = $(SRV_DIR)tcp_server $(CLI_DIR)tcp_client $(PRX_DIR)tcp_proxy beej_s beej_c
 ########################################
 # Recipes
 .PHONY: server all clean
@@ -55,14 +61,14 @@ EXEC = tcp_server tcp_client tcp_proxy beej_s beej_c
 all: $(TARGET)
 
 # PROXY 
-tcp_proxy : $(PROXY_OBJ) $(COMMON_OBJ)
-	$(CC) $^ -o $@ 
+tcp_proxy : $(PROX_OBJ) $(COMMON_OBJ)
+	$(CC) $^ -o $(PRX_DIR)$@ 
 # SERVER 
 tcp_server : $(SERVER_OBJ) $(COMMON_OBJ)
-	$(CC) $^ -o $@ 
+	$(CC) $^ -o $(SRV_DIR)$@ 
 # CLIENT
 tcp_client : $(CLIENT_OBJ) $(COMMON_OBJ)
-	$(CC) $^ -o $@ 
+	$(CC) $^ -o $(CLI_DIR)$@ 
 # BEEJ SERVER
 beej_s : $(BEEJ_S_OBJ)
 	$(CC) $^ -o $@ 
@@ -74,7 +80,7 @@ test : $(TEST_OBJ) $(COMMON_OBJ)
 	$(CC) $^ -o $@ 
 
 # PROXY OBJ FILES
-$(PROXY_OBJ) : $(SRC)tcp_proxy.c $(COMMON_H)
+$(PROX_OBJ) : $(SRC)tcp_proxy.c $(COMMON_H)
 	$(CC) $(INC_FLAGS) $(C_FLAGS) -c $< -o $@
 # SERVER OBJ FILES
 $(SERVER_OBJ) : $(SRC)tcp_server.c $(SERVER_H) $(COMMON_H)
@@ -97,3 +103,5 @@ clean:
 	rm -f $(ALL_OBJ) 
 	rmdir $(OBJ)
 	rm -f $(EXEC) test
+
+
