@@ -16,7 +16,7 @@
 #include "tcp_server.h"
 #include "tcp_common.h"
 
-#define PORT "3201"
+#define PORT "32001"
 #define BACKLOG 10
 #define HOSTNAME_LEN 256
 #define PORT_SIZE 16
@@ -110,7 +110,7 @@ int _server_get(int sockfd, struct command *cmd) {
         fprintf(stderr, "Error: proxy: failed to receive confirmation command.\n");
         return -1;
     }
-    
+
     return n_remaining;
 }
 
@@ -191,7 +191,7 @@ int _client_get(int sockfd, struct command *cmd) {
 
     // Don't send the server his confirmation until we know the client has
     // successfully 'gotten' the file they requested.
-    
+
     return n_remaining;
 }
 
@@ -371,7 +371,7 @@ int _get(int client_sock, int server_sock, struct command *cmd) {
     // restore the original 'cmd->dest' filename
     strncpy(cmd->dest, tmp_filename, MAX_FILENAME_LEN);
     // Respond with to the client with the file content we previously
-    // acquired.  First with the handshake, then the file contents. 
+    // acquired.  First with the handshake, then the file contents.
     // Finally, recieve confirmation of file write, and forward to
     // server.
     strncpy(tmp_filename, cmd->src, MAX_FILENAME_LEN);

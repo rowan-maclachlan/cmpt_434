@@ -16,7 +16,7 @@
 #include "tcp_server.h"
 #include "tcp_common.h"
 
-#define PORT "3200"
+#define PORT "32000"
 #define BACKLOG 10
 #define HOSTNAME_LEN 256
 

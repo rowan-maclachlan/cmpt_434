@@ -53,7 +53,7 @@ int _deserialize_cmd(char *cmd_buf, struct command *cmd) {
 
     memset(cmd->src, 0, MAX_FILENAME_LEN+1);
     memset(cmd->dest, 0, MAX_FILENAME_LEN+1);
-    if (5 != sscanf(cmd_buf, "%u %s %s %zu %u", 
+    if (5 != sscanf(cmd_buf, "%u %s %s %zu %u",
                 &(cmd->type), cmd->src, cmd->dest, &(cmd->fsz), &(cmd->err))) {
         fprintf(stderr, "sscanf failed to scan input.\n");
         return -1;
@@ -136,13 +136,12 @@ size_t send_file(FILE *file, int sockfd, size_t n_bytes) {
 
 size_t recv_write_file(int sockfd, FILE *file, size_t n_remaining) {
     size_t n_recvd = 0;
-    size_t n_write = 0;
     char file_buf[FILE_BUFF_MAX];
     int orig = n_remaining;
     printf("[%d] Receiving file contents on socket %d.\n", getpid(), sockfd);
     while(orig > 0) {
         n_recvd = _recv_file(file_buf, sockfd);
-        n_write = _write_file(file_buf, file, n_recvd);
+        _write_file(file_buf, file, n_recvd);
         orig -= n_recvd;
         if (0 == n_recvd) {
             break;
@@ -160,11 +159,11 @@ int _proxy_alter_buf(char *file_buf, int n_recvd) {
     char buf[FILESIZE_MAX] = { 0 };
     // Copy the original buffer
     memcpy(buf, file_buf, n_recvd);
-    
+
     for (buf_i = 0; buf_i < n_recvd; buf_i++) {
         char c = buf[buf_i]; // original character
         if (c == 'c' || c == 'm' || c == 'p' || c == 't') { // double char
-            file_buf[file_buf_i] = c; //     
+            file_buf[file_buf_i] = c; //
             file_buf[file_buf_i+1] = c;
             file_buf_i++;
         }
@@ -184,7 +183,6 @@ int _proxy_alter_buf(char *file_buf, int n_recvd) {
 size_t proxy_recv_write_file(int sockfd, FILE *file, size_t n_remaining) {
     size_t n_recvd = 0;
     size_t n_added = 0;
-    size_t n_write = 0;
     int orig = n_remaining;
     char file_buf[2*FILE_BUFF_MAX] = { 0 };
     printf("[%d] Receiving file contents on socket %d.\n", getpid(), sockfd);
@@ -194,7 +192,7 @@ size_t proxy_recv_write_file(int sockfd, FILE *file, size_t n_remaining) {
         // alter the buffer
         n_added = _proxy_alter_buf(file_buf, n_recvd);
         // write the altered buffer to file
-        n_write = _write_file(file_buf, file, n_added);
+        _write_file(file_buf, file, n_added);
         // we need to reduce n_remaining only by the bytes ACTUALLY recieved
         // from the client, because we are writing more than that to file.
         orig -= n_recvd;
@@ -246,7 +244,7 @@ int parse_cmd(char *buf, struct command *cmd) {
         cmd->src[MAX_FILENAME_LEN] = '\0';
         cmd->dest[MAX_FILENAME_LEN] = '\0';
     }
-    else { // Invalid 
+    else { // Invalid
         fprintf(stderr, "sscanf failed to scan input.\n");
         return -1;
     }
