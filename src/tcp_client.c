@@ -7,15 +7,15 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
-#include <errno.h> #include <string.h>
+#include <errno.h> 
+#include <string.h>
 #include <netdb.h>
 #include <sys/types.h>
 #include <netinet/in.h>
 #include <sys/socket.h>
 
 #include "tcp_common.h"
-
-#define PORT_SIZE 16
+#define PORT_SIZE 16 
 #define HOSTNAME_SIZE 64
 #define USAGE "[get|put|quit] filenamesource filenamedest"
 
@@ -75,7 +75,7 @@ int _put(int sockfd, struct command *cmd) {
 
 int _get(int sockfd, struct command *cmd) {
     FILE *file;
-    size_t n_remaining = 0;
+    int n_remaining = 0;
 
     file = fopen(cmd->dest, "w");
     if (NULL == file) {
@@ -106,7 +106,7 @@ int _get(int sockfd, struct command *cmd) {
     if (0 != (n_remaining = recv_write_file(sockfd, file, cmd->fsz))) {
         fprintf(stderr, "Error: client: failed to receive/write file.\n");
         cmd->err = FILE_INCOMPLETE;
-        cmd->fsz = n_remaining;
+        cmd->fsz = cmd->fsz - n_remaining;
     }
 
     fclose(file);

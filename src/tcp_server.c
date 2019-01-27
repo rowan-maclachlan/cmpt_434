@@ -61,7 +61,7 @@ int _put(int sockfd, struct command *cmd) {
  */
 int _get(int sockfd, struct command *cmd) {
     FILE *file;
-    size_t n_remaining = 0;
+    int n_remaining = 0;
 
     file = fopen(cmd->src, "r");
     if (NULL == file) {
@@ -92,13 +92,15 @@ int _get(int sockfd, struct command *cmd) {
     // Send handshake message
     cmd->err = FILE_OK;
     send_cmd(sockfd, cmd);
+    sleep(1);
     // send file
     n_remaining = send_file(file, sockfd, cmd->fsz);
     fclose(file);
 
     // Recieve confirmation that the file was fully written successfully.
     if (-1 == recv_cmd(sockfd, cmd)) {
-        fprintf(stderr, "Error: server: failed to receive the confirmation command.\n"); return -1;
+        fprintf(stderr, "Error: server: failed to receive the confirmation command.\n");
+        return -1;
     }
 
     return n_remaining;
@@ -185,11 +187,11 @@ int main(int argc, char **argv) {
         printf("server: got connection from %s on socket %d\n", s, new_fd);
 
         while(1) {
-            sleep(1);
             printf("server: waiting for commands...\n");
 
             if (-1 == recv_cmd(new_fd, &cmd)) {
                 fprintf(stderr, "Error: server: failed to receive command.\n");
+                sleep(2);
                 continue;
             }
 

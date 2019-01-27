@@ -69,7 +69,7 @@ int _server_put(int sockfd, struct command *cmd) {
  */
 int _server_get(int sockfd, struct command *cmd) {
     FILE *file;
-    size_t n_remaining = 0;
+    int n_remaining = 0;
 
     file = fopen(cmd->src, "r");
     if (NULL == file) {
@@ -97,11 +97,12 @@ int _server_get(int sockfd, struct command *cmd) {
         return -1;
     }
 
+    // Send handshake
     cmd->err = FILE_OK;
     send_cmd(sockfd, cmd);
     sleep(1);
+    // send file
     n_remaining = send_file(file, sockfd, cmd->fsz);
-
     fclose(file);
 
     // Recieve confirmation from client.
@@ -152,11 +153,12 @@ int _client_put(int sockfd, struct command *cmd) {
 
 int _client_get(int sockfd, struct command *cmd) {
     FILE *file;
-    size_t n_remaining = 0;
+    int n_remaining = 0;
 
     file = fopen(cmd->dest, "w");
     if (NULL == file) {
         perror("fopen");
+        cmd->err = FILE_CANT_WRITE;
         return -1;
     }
 
@@ -168,6 +170,7 @@ int _client_get(int sockfd, struct command *cmd) {
     if (-1 == recv_cmd(sockfd, cmd)) {
         fprintf(stderr, "Error: proxy: failed to receive handshake command.\n");
         fclose(file);
+        cmd->err = CMD_FAILED;
         return -1;
     }
 
@@ -180,6 +183,8 @@ int _client_get(int sockfd, struct command *cmd) {
     // Receive file contents
     if (0 != (n_remaining = proxy_recv_write_file(sockfd, file, cmd->fsz))) {
         fprintf(stderr, "Error: proxy: failed to receive/write file.\n");
+        cmd->err = FILE_INCOMPLETE;
+        cmd->fsz = cmd->fsz - n_remaining;
     }
 
     fclose(file);
@@ -418,6 +423,7 @@ int main(int argc, char **argv) {
 
             if (-1 == recv_cmd(client_sock, &cmd)) {
                 fprintf(stderr, "Error: proxy: failed to receive command.\n");
+                sleep(2);
                 continue;
             }
 

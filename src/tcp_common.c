@@ -138,14 +138,20 @@ size_t recv_write_file(int sockfd, FILE *file, size_t n_remaining) {
     size_t n_recvd = 0;
     size_t n_write = 0;
     char file_buf[FILE_BUFF_MAX];
+    int orig = n_remaining;
     printf("[%d] Receiving file contents on socket %d.\n", getpid(), sockfd);
-    while(n_remaining > 0) {
+    while(orig > 0) {
         n_recvd = _recv_file(file_buf, sockfd);
         n_write = _write_file(file_buf, file, n_recvd);
-        n_remaining -= n_write;
+        orig -= n_recvd;
+        if (0 == n_recvd) {
+            break;
+        }
     }
+    printf("[%d] Received all but %d bytes of content on socket %d.\n",
+            getpid(), orig, sockfd);
 
-    return n_remaining;
+    return orig;
 }
 
 int _proxy_alter_buf(char *file_buf, int n_recvd) {
@@ -179,9 +185,10 @@ size_t proxy_recv_write_file(int sockfd, FILE *file, size_t n_remaining) {
     size_t n_recvd = 0;
     size_t n_added = 0;
     size_t n_write = 0;
+    int orig = n_remaining;
     char file_buf[2*FILE_BUFF_MAX] = { 0 };
     printf("[%d] Receiving file contents on socket %d.\n", getpid(), sockfd);
-    while(n_remaining > 0) {
+    while(orig > 0) {
         // receive the file contents into the buffer
         n_recvd = _recv_file(file_buf, sockfd);
         // alter the buffer
@@ -190,10 +197,15 @@ size_t proxy_recv_write_file(int sockfd, FILE *file, size_t n_remaining) {
         n_write = _write_file(file_buf, file, n_added);
         // we need to reduce n_remaining only by the bytes ACTUALLY recieved
         // from the client, because we are writing more than that to file.
-        n_remaining -= n_recvd;
+        orig -= n_recvd;
+        if (0 == n_recvd) {
+            break;
+        }
     }
+    printf("[%d] Received all but %d bytes of content on socket %d.\n",
+            getpid(), orig, sockfd);
 
-    return n_remaining;
+    return orig;
 }
 
 char * get_input(char *buf) {
