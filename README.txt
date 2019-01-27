@@ -23,6 +23,8 @@ folders 'server_dir', 'client_dir', and 'proxy_dir', respectively.
  command prompt.  The commands should be input as described in the assignment
  specification.  In the "client_dir" folder, however, there is a file called
  "test.txt" which the user can provide as an argument to test the application.
+ 5) Questions and answers for part 1 can be found in a .pdf file under the
+ directory ./p2/.  The Latex source for the pdf is in the same directory.
 
 POSSIBLE ISSUES WITH TESTING:
 
